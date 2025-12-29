@@ -44,6 +44,20 @@ class AutoInjector:
     def __init__(self):
         self._setup_driver()
         self._ensure_dirs()
+        self.lock_viewport = True  # 锁定视口滚动位置，保证成对截图一致
+
+    def _normalize_bbox(self, bbox):
+        """将像素坐标归一化到 [0,1] 便于跨分辨率训练"""
+        try:
+            w, h = VIEWPORT_SIZE
+            return {
+                "x": bbox["x"] / w,
+                "y": bbox["y"] / h,
+                "width": bbox["width"] / w,
+                "height": bbox["height"] / h,
+            }
+        except:
+            return {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
 
     def _setup_driver(self):
         """初始化无头浏览器"""
@@ -64,14 +78,26 @@ class AutoInjector:
             os.makedirs(d, exist_ok=True)
 
     def wait_for_page_ready(self):
-        """智能等待"""
+        """智能等待，确保页面完全渲染"""
         try:
+            # 等待 DOM 完成
             WebDriverWait(self.driver, 15).until(
                 lambda d: d.execute_script("return document.readyState") == "complete"
             )
         except:
             print("[!] 页面状态等待超时，尝试继续...")
-        time.sleep(2) 
+        
+        # 额外等待，让 CSS/字体/图片渲染
+        time.sleep(3)
+        
+        # 滚动到底部再回顶部，触发懒加载
+        try:
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(1)
+            self.driver.execute_script("window.scrollTo(0, 0);")
+            time.sleep(1)
+        except:
+            pass 
 
     def load_page(self, url):
         print(f"[*] 正在加载: {url}")
@@ -92,6 +118,7 @@ class AutoInjector:
                 ("//img", By.XPATH), ("//h1|//h2|//h3", By.XPATH), ("//p", By.XPATH),
                 ("//div[@class or @id]", By.XPATH)
             ]
+            noisy_keywords = ['carousel', 'slider', 'slick', 'swiper', 'marquee', 'ad', 'ads', 'advert', 'sponsor', 'banner', 'promo']
             
             for selector, by in selectors:
                 elements = self.driver.find_elements(by, selector)
@@ -111,7 +138,15 @@ class AutoInjector:
                         # 2. 坐标过滤 (排除负坐标)
                         if rect['x'] < 0 or rect['y'] < 0: continue
 
-                        # 3. [新增] 幽灵元素过滤 (针对透明且无内容的 div/span)
+                        # 3. 过滤易引起重排或广告区域（轮播/广告位不稳定）
+                        try:
+                            id_cls = (elem.get_attribute('id') or '').lower() + ' ' + (elem.get_attribute('class') or '').lower()
+                            if any(k in id_cls for k in noisy_keywords):
+                                continue
+                        except:
+                            pass
+
+                        # 4. [新增] 幽灵元素过滤 (针对透明且无内容的 div/span)
                         tag = elem.tag_name.lower()
                         if tag in ['div', 'span', 'section']:
                             has_text = self.driver.execute_script("return arguments[0].innerText.trim().length > 0", elem)
@@ -130,18 +165,88 @@ class AutoInjector:
             print(f"[!] 元素查找异常: {e}")
             return []
 
+    def pause_animations(self):
+        """禁用页面动画/过渡，减少重排导致的定位偏移"""
+        script = """
+        try {
+            const all = Array.from(document.querySelectorAll('*'));
+            all.forEach(el => {
+                el.style.animation = 'none !important';
+                el.style.transition = 'none !important';
+            });
+        } catch(e) {}
+        """
+        try:
+            self.driver.execute_script(script)
+        except:
+            pass
+
     def scroll_to_element(self, element):
         self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
         time.sleep(0.5)
+
+    def get_scroll_y(self):
+        try:
+            return int(self.driver.execute_script("return Math.round(window.pageYOffset || window.scrollY || 0);"))
+        except:
+            return 0
+
+    def set_scroll_y(self, y):
+        try:
+            self.driver.execute_script("window.scrollTo(0, arguments[0]);", y)
+        except:
+            pass
+
+    def _add_debug_overlay(self, bbox):
+        """在页面上方添加一个红色矩形覆盖层，仅用于 DEBUG 截图。"""
+        if not DEBUG_MODE:
+            return
+        try:
+            self.driver.execute_script(
+                """
+                (function(b){
+                    let o = document.getElementById('__debug_overlay__');
+                    if(!o){
+                        o = document.createElement('div');
+                        o.id='__debug_overlay__';
+                        o.style.position='absolute';
+                        o.style.pointerEvents='none';
+                        o.style.zIndex='2147483647';
+                        document.body.appendChild(o);
+                    }
+                    o.style.border='4px solid red';
+                    o.style.boxShadow='0 0 15px red';
+                    o.style.left = (b.x + window.scrollX) + 'px';
+                    o.style.top = (b.y + window.scrollY) + 'px';
+                    o.style.width = b.width + 'px';
+                    o.style.height = b.height + 'px';
+                    o.style.display='block';
+                })({x: arguments[0].x, y: arguments[0].y, width: arguments[0].width, height: arguments[0].height});
+                """,
+                bbox,
+            )
+        except:
+            pass
+
+    def _remove_debug_overlay(self):
+        if not DEBUG_MODE:
+            return
+        try:
+            self.driver.execute_script(
+                """
+                const o = document.getElementById('__debug_overlay__');
+                if(o) o.style.display='none';
+                """
+            )
+        except:
+            pass
 
     def inject_bug(self, element, bug_type):
         """执行故障注入"""
         bug_info = {}
         
-        # 定义视觉辅助样式 (仅在 DEBUG_MODE 下生效)
+        # 调试时不在元素本身添加任何红框，统一由截图前的 overlay 显示
         visual_aid = ""
-        if DEBUG_MODE:
-            visual_aid = "arguments[0].style.border = '3px solid red'; arguments[0].style.boxShadow = '0 0 10px red';"
         
         try:
             if not element.is_displayed(): return False, None
@@ -150,6 +255,11 @@ class AutoInjector:
             # 获取初始坐标
             rect = self.driver.execute_script("return arguments[0].getBoundingClientRect();", element)
             current_bbox = {"x": rect['x'], "y": rect['y'], "width": rect['width'], "height": rect['height']}
+
+            # 过滤掉过小的元素（注入效果不明显）
+            min_width, min_height = 30, 15
+            if current_bbox['width'] < min_width or current_bbox['height'] < min_height:
+                return False, None
 
             # 注入前视口检查
             if not self._is_in_viewport(current_bbox): return False, None
@@ -172,9 +282,10 @@ class AutoInjector:
                 # 隐藏元素，如果是DEBUG模式，放一个红色占位符
                 placeholder_script = ""
                 if DEBUG_MODE:
+                    # 使用微弱背景占位，避免产生第二个红框
                     placeholder_script = """
                     const p = document.createElement('div');
-                    p.style.cssText = 'width:'+arguments[0].offsetWidth+'px;height:'+arguments[0].offsetHeight+'px;border:2px dashed red;background:rgba(255,0,0,0.1);';
+                    p.style.cssText = 'width:'+arguments[0].offsetWidth+'px;height:'+arguments[0].offsetHeight+"px;background:rgba(255,0,0,0.06);border:none;outline:none;";
                     arguments[0].parentNode.insertBefore(p, arguments[0]);
                     """
                 script = f"""
@@ -184,16 +295,29 @@ class AutoInjector:
                 self.driver.execute_script(script, element)
 
             elif bug_type == "Text_Overflow":
-                long_text = "ERROR_OVERFLOW_" * 20
-                bg_style = "arguments[0].style.backgroundColor = 'rgba(255,0,0,0.2)';" if DEBUG_MODE else ""
+                long_text = "ERROR_OVERFLOW_" * 30
+                bg_style = "arguments[0].style.backgroundColor = 'rgba(255,0,0,0.15)';" if DEBUG_MODE else ""
                 script = f"""
-                arguments[0].style.position = 'relative';
-                arguments[0].style.zIndex = '9999';
-                arguments[0].style.whiteSpace = 'nowrap';
-                arguments[0].style.overflow = 'visible';
-                arguments[0].innerText = '{long_text}';
-                {bg_style}
-                {visual_aid}
+                (function(el) {{
+                    const tag = (el.tagName || '').toLowerCase();
+                    const isInput = tag === 'input' || tag === 'textarea';
+                    if (isInput) {{
+                        el.value = '{long_text}';
+                        el.removeAttribute('maxlength');
+                        el.style.whiteSpace = 'nowrap';
+                        el.style.overflow = 'visible';
+                        el.style.minWidth = (el.offsetWidth * 2) + 'px';
+                        el.style.width = (el.offsetWidth * 2.5) + 'px';
+                    }} else {{
+                        el.style.whiteSpace = 'nowrap';
+                        el.style.overflow = 'visible';
+                        el.textContent = '{long_text}';
+                    }}
+                    el.style.position = 'relative';
+                    el.style.zIndex = '9999';
+                    {bg_style}
+                    {visual_aid}
+                }})(arguments[0]);
                 """
                 self.driver.execute_script(script, element)
                 # 重新获取尺寸
@@ -219,9 +343,13 @@ class AutoInjector:
 
             elif bug_type == "Layout_Alignment":
                 # 通过不当的偏移或内边距制造对齐问题
-                shift_px = random.choice([12, 16, 20, 24])
-                use_padding = random.choice([True, False])
-                prop = "paddingTop" if use_padding else "marginLeft"
+                # 跳过表单元素（偏移不够明显）
+                tag = element.tag_name.lower()
+                if tag in ['input', 'textarea', 'select']:
+                    return False, None
+                shift_px = random.randint(24, 48)
+                use_padding = random.random() < 0.4
+                prop = random.choice(["paddingLeft", "paddingTop"]) if use_padding else random.choice(["marginLeft", "marginRight", "marginTop"])
                 script = f"""
                 const el = arguments[0];
                 el.style.position = 'relative';
@@ -234,6 +362,10 @@ class AutoInjector:
 
             elif bug_type == "Layout_Spacing":
                 # 在容器内随机拉大/缩小部分子元素的间距
+                # 跳过表单元素（无子元素或不适合此类缺陷）
+                tag = element.tag_name.lower()
+                if tag in ['input', 'textarea', 'select', 'button', 'img']:
+                    return False, None
                 child_count = self.driver.execute_script("return arguments[0].children ? arguments[0].children.length : 0;", element)
                 if not child_count or child_count < 2:
                     return False, None
@@ -241,10 +373,10 @@ class AutoInjector:
                 (function(el) {{
                     const kids = Array.from(el.children || []);
                     if (kids.length < 2) return;
-                    const pickCount = Math.max(1, Math.floor(kids.length * 0.3));
+                    const pickCount = Math.max(1, Math.floor(kids.length * 0.5));
                     for (let i = 0; i < pickCount; i++) {{
                         const kid = kids[Math.floor(Math.random() * kids.length)];
-                        const delta = 8 + Math.floor(Math.random() * 18);
+                        const delta = 20 + Math.floor(Math.random() * 25);
                         const prop = Math.random() > 0.5 ? 'marginTop' : 'marginBottom';
                         kid.style[prop] = delta + 'px';
                         kid.style.transition = 'none';
@@ -276,9 +408,10 @@ class AutoInjector:
                 current_bbox = {"x": rect['x'], "y": rect['y'], "width": rect['width'], "height": rect['height']}
 
             elif bug_type == "Style_Color_Contrast":
-                # 故意降低文本与背景的对比度
+                # 故意降低文本与背景的对比度：使用更激进的方式让文本难以阅读
                 script = f"""
                 (function(el) {{
+                    el.offsetHeight;
                     const cs = window.getComputedStyle(el);
                     function parseColor(c) {{
                         const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
@@ -286,13 +419,12 @@ class AutoInjector:
                         return [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];
                     }}
                     const bg = parseColor(cs.backgroundColor) || [240, 240, 240];
-                    const delta = 12;
-                    const sign = Math.random() > 0.5 ? 1 : -1;
-                    const close = bg.map(v => Math.max(0, Math.min(255, v + sign * delta)));
-                    el.style.color = `rgb(${close[0]}, ${close[1]}, ${close[2]})`;
-                    el.style.textShadow = 'none';
+                    // 策略: 直接使用背景色作为文本色（极端情况，文本不可见）
+                    const textColor = `rgb(${{bg[0]}}, ${{bg[1]}}, ${{bg[2]}})`;
+                    el.style.cssText += '; color: ' + textColor + ' !important; text-shadow: none !important; opacity: 0.6 !important;';
+                    el.offsetHeight;
                     {visual_aid}
-                }})(arguments[0]);
+                }})( arguments[0]);
                 """
                 self.driver.execute_script(script, element)
 
@@ -349,6 +481,8 @@ class AutoInjector:
         
         # 每次生成前先清理环境
         self.remove_popups_and_fixed_elements()
+        # 关闭动画/过渡，避免注入后大幅重排
+        self.pause_animations()
 
         for attempt in range(max_retries):
             try:
@@ -363,6 +497,8 @@ class AutoInjector:
                 normal_bbox = {"x": rect['x'], "y": rect['y'], "width": rect['width'], "height": rect['height']}
                 
                 if not self._is_in_viewport(normal_bbox): continue
+                # 记录滚动位置用于锁定
+                scroll_y = self.get_scroll_y()
 
                 normal_path = os.path.join(IMG_DIR, f"{pair_id}_normal.png")
                 self.driver.save_screenshot(normal_path)
@@ -379,18 +515,46 @@ class AutoInjector:
                     self._reset_page()
                     continue
 
+                # 等待注入渲染 + 强制浏览器重排
+                time.sleep(0.8)
+                self.driver.execute_script("window.dispatchEvent(new Event('resize')); document.body.offsetHeight;")
+                time.sleep(0.3)
+                
                 # --- Buggy 截图 ---
-                time.sleep(0.5)
+                # 锁定到注入前的滚动位置，确保两张图视口一致
+                if self.lock_viewport:
+                    self.set_scroll_y(scroll_y)
+                    time.sleep(0.2)
+                
+                # 在锁定滚动后再添加临时调试覆盖层（尝试使用注入后的 bbox，更贴合元素实际位置）
+                overlay_bbox = normal_bbox
+                try:
+                    rect_after = self.driver.execute_script("return arguments[0].getBoundingClientRect();", target)
+                    if rect_after and rect_after.get('width', 0) > 0 and rect_after.get('height', 0) > 0:
+                        overlay_bbox = {"x": rect_after['x'], "y": rect_after['y'], "width": rect_after['width'], "height": rect_after['height']}
+                except:
+                    pass
+                try:
+                    self._add_debug_overlay(overlay_bbox)
+                except:
+                    pass
+                
                 buggy_path = os.path.join(IMG_DIR, f"{pair_id}_buggy.png")
                 self.driver.save_screenshot(buggy_path)
+                # 截图后立即移除覆盖层
+                try:
+                    self._remove_debug_overlay()
+                except:
+                    pass
                 
                 # --- 校验逻辑 ---
-                # 只有在关闭调试模式时，才进行像素校验
+                # 即使在 DEBUG_MODE 下也计算 diff，以监控注入是否生效
                 valid_sample = True
                 diff_score = 0.0
-                
+
+                diff_score = self._calculate_image_diff(normal_path, buggy_path)
+                # 在 DEBUG_MODE 下总是保存（用于肉眼检查），否则按 diff 阈值过滤
                 if not DEBUG_MODE:
-                    diff_score = self._calculate_image_diff(normal_path, buggy_path)
                     # 阈值设定：如果差异太小，说明注入无效
                     if diff_score < 2.0:
                         print(f"[-] {pair_id} 差异过小 (RMS={diff_score:.2f})，丢弃")
@@ -401,11 +565,21 @@ class AutoInjector:
                         valid_sample = False
                 
                 if valid_sample:
+                    bbox_after = info['bbox']
                     label_data = {
-                        "id": pair_id, "url": url, "bug_type": info['type'],
-                        "bbox": info['bbox'], "diff_score": diff_score,
-                        "image_size": VIEWPORT_SIZE, "timestamp": str(datetime.now())
+                        "id": pair_id,
+                        "url": url,
+                        "bug_type": info['type'],
+                        "bbox_before": normal_bbox,
+                        "bbox_after": bbox_after,
+                        "bbox_before_norm": self._normalize_bbox(normal_bbox),
+                        "bbox_after_norm": self._normalize_bbox(bbox_after),
+                        "diff_score": diff_score,
+                        "image_size": VIEWPORT_SIZE,
+                        "timestamp": str(datetime.now()),
                     }
+                    if self.lock_viewport:
+                        label_data["scroll_y"] = scroll_y
                     with open(os.path.join(META_DIR, f"{pair_id}.json"), "w") as f:
                         json.dump(label_data, f, indent=2)
                     print(f"[+] 成功: {pair_id} | {info['type']} | Diff: {diff_score:.2f}")
