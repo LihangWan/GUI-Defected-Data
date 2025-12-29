@@ -217,6 +217,103 @@ class AutoInjector:
                 """
                 self.driver.execute_script(script, element)
 
+            elif bug_type == "Layout_Alignment":
+                # 通过不当的偏移或内边距制造对齐问题
+                shift_px = random.choice([12, 16, 20, 24])
+                use_padding = random.choice([True, False])
+                prop = "paddingTop" if use_padding else "marginLeft"
+                script = f"""
+                const el = arguments[0];
+                el.style.position = 'relative';
+                el.style.{prop} = '{shift_px}px';
+                el.style.transition = 'none';
+                {visual_aid}
+                """
+                self.driver.execute_script(script, element)
+                # 对齐偏移不会显著改变自身 bbox，这里保留原 bbox
+
+            elif bug_type == "Layout_Spacing":
+                # 在容器内随机拉大/缩小部分子元素的间距
+                child_count = self.driver.execute_script("return arguments[0].children ? arguments[0].children.length : 0;", element)
+                if not child_count or child_count < 2:
+                    return False, None
+                script = f"""
+                (function(el) {{
+                    const kids = Array.from(el.children || []);
+                    if (kids.length < 2) return;
+                    const pickCount = Math.max(1, Math.floor(kids.length * 0.3));
+                    for (let i = 0; i < pickCount; i++) {{
+                        const kid = kids[Math.floor(Math.random() * kids.length)];
+                        const delta = 8 + Math.floor(Math.random() * 18);
+                        const prop = Math.random() > 0.5 ? 'marginTop' : 'marginBottom';
+                        kid.style[prop] = delta + 'px';
+                        kid.style.transition = 'none';
+                    }}
+                    {visual_aid}
+                }})(arguments[0]);
+                """
+                self.driver.execute_script(script, element)
+
+            elif bug_type == "Data_Format_Error":
+                # 将 number 输入框填入非数字字符
+                target_elem = element
+                if element.tag_name.lower() != 'input' or (element.get_attribute('type') or '').lower() != 'number':
+                    candidates = [el for el in self.driver.find_elements(By.CSS_SELECTOR, "input[type='number']") if el.is_displayed()]
+                    if not candidates:
+                        return False, None
+                    target_elem = random.choice(candidates)
+                    self.scroll_to_element(target_elem)
+
+                invalid_value = random.choice(["abcXYZ", "NaN??", "###", "１２３abc", "error"])
+                script = f"""
+                const el = arguments[0];
+                el.value = '{invalid_value}';
+                el.setAttribute('data-injected','true');
+                {visual_aid}
+                """
+                self.driver.execute_script(script, target_elem)
+                rect = self.driver.execute_script("return arguments[0].getBoundingClientRect();", target_elem)
+                current_bbox = {"x": rect['x'], "y": rect['y'], "width": rect['width'], "height": rect['height']}
+
+            elif bug_type == "Style_Color_Contrast":
+                # 故意降低文本与背景的对比度
+                script = f"""
+                (function(el) {{
+                    const cs = window.getComputedStyle(el);
+                    function parseColor(c) {{
+                        const m = c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+                        if (!m) return null;
+                        return [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];
+                    }}
+                    const bg = parseColor(cs.backgroundColor) || [240, 240, 240];
+                    const delta = 12;
+                    const sign = Math.random() > 0.5 ? 1 : -1;
+                    const close = bg.map(v => Math.max(0, Math.min(255, v + sign * delta)));
+                    el.style.color = `rgb(${close[0]}, ${close[1]}, ${close[2]})`;
+                    el.style.textShadow = 'none';
+                    {visual_aid}
+                }})(arguments[0]);
+                """
+                self.driver.execute_script(script, element)
+
+            elif bug_type == "Style_Size_Inconsistent":
+                # 让元素尺寸与同级元素不一致
+                scale = round(random.uniform(0.75, 1.3), 2)
+                width_factor = round(random.uniform(0.8, 1.25), 2)
+                script = f"""
+                const el = arguments[0];
+                const rectNow = el.getBoundingClientRect();
+                el.style.display = 'inline-block';
+                el.style.transformOrigin = 'center center';
+                el.style.transform = 'scale({scale})';
+                el.style.width = (rectNow.width * {width_factor}) + 'px';
+                el.style.boxSizing = 'border-box';
+                {visual_aid}
+                """
+                self.driver.execute_script(script, element)
+                rect = self.driver.execute_script("return arguments[0].getBoundingClientRect();", element)
+                current_bbox = {"x": rect['x'], "y": rect['y'], "width": rect['width'], "height": rect['height']}
+
             bug_info = {"type": bug_type, "bbox": current_bbox, "script": script}
             return True, bug_info
 
@@ -271,7 +368,11 @@ class AutoInjector:
                 self.driver.save_screenshot(normal_path)
                 
                 # --- Bug 注入 ---
-                bug_type = random.choice(["Layout_Overlap", "Element_Missing", "Text_Overflow", "Broken_Image"])
+                bug_type = random.choice([
+                    "Layout_Overlap", "Element_Missing", "Text_Overflow", "Broken_Image",
+                    "Layout_Alignment", "Layout_Spacing", "Data_Format_Error",
+                    "Style_Color_Contrast", "Style_Size_Inconsistent"
+                ])
                 success, info = self.inject_bug(target, bug_type)
                 
                 if not success: 
