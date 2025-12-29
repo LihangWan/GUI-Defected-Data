@@ -1,0 +1,16 @@
+{
+  "id": "ca6b3962",
+  "url": "https://github.blog",
+  "bug_type": "Element_Missing",
+  "bbox": {
+    "x": 327.5,
+    "y": 493.84375,
+    "width": 150.34375,
+    "height": 25
+  },
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2025-12-27 11:21:01.354304"
+}

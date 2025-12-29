@@ -1,0 +1,16 @@
+{
+  "id": "dd3a06c7",
+  "url": "https://github.blog",
+  "bug_type": "Layout_Overlap",
+  "bbox": {
+    "x": 287.5,
+    "y": 433.84375,
+    "width": 150.34375,
+    "height": 25
+  },
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2025-12-27 11:21:16.261036"
+}

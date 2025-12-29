@@ -1,0 +1,16 @@
+{
+  "id": "f538a197",
+  "url": "https://www.w3schools.com",
+  "bug_type": "Text_Overflow",
+  "bbox": {
+    "x": 977.984375,
+    "y": 409.1875,
+    "width": 615.984375,
+    "height": 44
+  },
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2025-12-27 11:22:44.635447"
+}

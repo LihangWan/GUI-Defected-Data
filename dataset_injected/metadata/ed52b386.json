@@ -1,0 +1,16 @@
+{
+  "id": "ed52b386",
+  "url": "https://www.python.org",
+  "bug_type": "Text_Overflow",
+  "bbox": {
+    "x": 379.5,
+    "y": 384.703125,
+    "width": 210,
+    "height": 210
+  },
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2025-12-27 11:19:26.093323"
+}

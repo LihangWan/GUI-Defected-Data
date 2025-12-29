@@ -1,0 +1,16 @@
+{
+  "id": "8efc234f",
+  "url": "https://www.w3schools.com",
+  "bug_type": "Layout_Overlap",
+  "bbox": {
+    "x": 525.984375,
+    "y": 384.1875,
+    "width": 200,
+    "height": 43
+  },
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2025-12-27 11:22:32.394602"
+}
