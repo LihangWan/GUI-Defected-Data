@@ -311,177 +311,24 @@ def save_multiple_pairs(self, url, samples_per_page=5):
         self._reset_page_light()
 ```
 
-**效果**：
+**理论提速效果**（需实际测试验证）：
 ```
-5 样本 = load(2s) + 5 × [注入+截图+重置](0.8s) = 6s
-→ 提速 2.5 倍（15s → 6s）
+当前基线：单样本 ≈ 3s
+
+预期优化后：
+- 批量注入（5样本/页）：分摊加载成本 → 单样本 ≈ 1.2s
+- +轻量重置：避免完整reload → 单样本 ≈ 0.8s  
+- +资源拦截：跳过无关资源 → 单样本 ≈ 0.6s
+- +并发（5 workers）：并行处理 → 等效单样本 ≈ 0.15s
+
+10K样本预计时间：25-45分钟（需实测）
 ```
+
+**最终目标**：10K 样本 < 1 小时，100K 样本 < 10 小时
 
 ---
 
-#### 手段 2：轻量重置（Lightweight Reset）
-
-**当前问题**：每次注入后完整 reload 页面
-```python
-self.driver.refresh()  # 2s
-self.wait_for_page_ready()  # 1-3s
-```
-
-**优化方案**：仅清理注入痕迹，不 reload
-```python
-def _reset_page_light(self):
-    """轻量重置：移除注入标记，恢复初始样式"""
-    script = """
-    (function() {
-        // 移除所有注入的 style 标签
-        document.querySelectorAll('[data-injected="true"]').forEach(el => {
-            el.remove();
-        });
-        
-        // 恢复所有元素的 inline 样式
-        document.querySelectorAll('*').forEach(el => {
-            el.style.cssText = '';
-        });
-        
-        // 重新加载被替换的图片
-        document.querySelectorAll('img[data-original-src]').forEach(img => {
-            img.src = img.getAttribute('data-original-src');
-            img.removeAttribute('data-original-src');
-        });
-        
-        // 恢复文本内容
-        document.querySelectorAll('[data-original-text]').forEach(el => {
-            el.textContent = el.getAttribute('data-original-text');
-            el.removeAttribute('data-original-text');
-        });
-    })();
-    """
-    self.driver.execute_script(script)
-    time.sleep(0.2)  # 短暂等待 DOM 更新
-```
-
-**效果**：
-```
-完整 reload = 2-3s
-轻量重置 = 0.2s
-→ 提速 10-15 倍
-```
-
----
-
-#### 手段 3：浏览器池（Browser Pooling）
-
-**当前问题**：每个 URL 都创建新 driver 实例
-```python
-for url in TARGET_URLS:
-    driver = webdriver.Chrome()  # 启动 1-2s
-    # ... 处理
-    driver.quit()
-```
-
-**优化方案**：复用 driver 实例
-```python
-class DriverPool:
-    def __init__(self, pool_size=3):
-        self.drivers = [self._create_driver() for _ in range(pool_size)]
-        self.available = set(self.drivers)
-        self.lock = threading.Lock()
-    
-    def acquire(self):
-        """获取可用 driver"""
-        with self.lock:
-            if self.available:
-                driver = self.available.pop()
-                self._clean_driver(driver)
-                return driver
-            raise Exception("No available drivers")
-    
-    def release(self, driver):
-        """释放 driver"""
-        with self.lock:
-            self.available.add(driver)
-    
-    def _clean_driver(self, driver):
-        """清理 driver 状态"""
-        driver.delete_all_cookies()
-        driver.execute_script("""
-            localStorage.clear();
-            sessionStorage.clear();
-        """)
-
-# 使用
-pool = DriverPool(pool_size=5)
-driver = pool.acquire()
-try:
-    # ... 处理逻辑
-finally:
-    pool.release(driver)
-```
-
-**效果**：
-```
-避免重复启动 Chrome，节省 1-2s/URL
-```
-
----
-
-#### 手段 4：并行化（Parallelization）
-
-**当前问题**：串行处理 URL
-```python
-for url in TARGET_URLS:  # 串行
-    process_url(url)
-```
-
-**优化方案**：并发处理多个 URL
-```python
-from concurrent.futures import ThreadPoolExecutor, as_completed
-
-def run_parallel(urls, max_workers=3):
-    """并行处理 URL 列表"""
-    pool = DriverPool(pool_size=max_workers)
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {}
-        for url in urls:
-            driver = pool.acquire()
-            future = executor.submit(process_url, driver, url)
-            futures[future] = driver
-        
-        for future in as_completed(futures):
-            driver = futures[future]
-            try:
-                result = future.result()
-                print(f"✅ 完成: {result}")
-            except Exception as e:
-                print(f"❌ 失败: {e}")
-            finally:
-                pool.release(driver)
-
-# 使用
-run_parallel(TARGET_URLS['fast'], max_workers=5)
-```
-
-**效果**：
-```
-串行：6 URL × 3 样本 × 0.8s = 14.4s
-并行（3 workers）：14.4s / 3 = 4.8s
-→ 提速 3 倍
-```
-
----
-
-### 2.3 综合提速效果
-
-| 阶段 | 方法 | 单样本时间 | 10K 样本总时间 |
-|------|------|-----------|---------------|
-| **当前** | 串行 + 完整 reload | 3s | 8.3h |
-| **+批量注入** | 5 samples/page | 1.2s | 3.3h |
-| **+轻量重置** | 替代 reload | 0.8s | 2.2h |
-| **+浏览器池** | 复用 driver | 0.6s | 1.7h |
-| **+并行（5 workers）** | 并发处理 | 0.15s | 25min |
-
-**最终目标**：10K 样本 < 30 分钟，100K 样本 < 5 小时
+### 2.4 稳定性增强
 
 ---
 
@@ -786,11 +633,14 @@ stats = interceptor.get_stats()
 print(f"拦截了 {stats['intercepted_count']} 个请求")
 ```
 
-**效果示例**：
+**预期效果**：
 ```
-未拦截：加载 3.8s（112 个请求）
-拦截后：加载 1.9s（34 个请求）
-→ 减少 50% 时间
+根据业界实践，拦截 image/font/tracking/ads 等资源通常可以：
+- 减少 30-50% 的请求数量
+- 减少 30-50% 的加载时间
+- 具体效果取决于目标网站的资源构成
+
+建议：实际测试后记录真实数据
 ```
 
 ---
@@ -981,16 +831,16 @@ waiter = AdaptiveWaitManager(driver, profile='medium')
 wait_time = waiter.wait_for_page_ready()
 ```
 
-**效果对比**：
+**效果对比**（理论预期，需实测验证）：
 ```
 固定等待 8s：
   - 快站点浪费 6s
   - 慢站点可能不够
 
 自适应等待：
-  - 快站点 1.5-2s ✅
-  - 中速站点 3-5s ✅
-  - 慢速站点 6-12s ✅（有超时保护）
+  - 快站点：1.5-2s（根据实际 DOM ready 时间）
+  - 中速站点：3-5s（等待首屏内容）
+  - 慢速站点：6-12s（深度等待 + 超时保护）
 ```
 
 ---
@@ -1175,15 +1025,25 @@ success = loader.load_with_fallback(url)
 
 #### 场景：生成 100K 样本，覆盖 15 个站点，3 种分辨率
 
-| 方案 | 单样本时间 | 并发数 | 总时间 | 说明 |
-|------|-----------|-------|--------|------|
-| **无优化** | 12s | 1 | 333h (14天) | 固定等待 8s + 无拦截 |
-| **+资源拦截** | 7s | 1 | 194h | 减少 40% 加载时间 |
-| **+自适应等待** | 4.5s | 1 | 125h | 避免无用等待 |
-| **+批量注入** | 1.2s | 1 | 33h | 分摊加载成本 |
-| **+并发(15)** | 1.2s | 15 | **2.2h** ✅ | 最终方案 |
+**理论分析**（需实际测试验证）：
 
-**结论**：从 14 天 → 2.2 小时，加速 **150 倍**
+| 优化阶段 | 预期效果 | 说明 |
+|---------|---------|------|
+| **基线** | 单样本 3s | 当前串行方式 |
+| **+资源拦截** | 减少 30-40% | 跳过 image/font/tracking |
+| **+自适应等待** | 减少 20-30% | 避免固定等待浪费 |
+| **+批量注入** | 提速 2-3 倍 | 分摊页面加载成本 |
+| **+并发（15）** | 理论提速 10-15 倍 | 取决于 CPU/网络 |
+
+**建议实施步骤**：
+1. 先实现单项优化，实测效果
+2. 记录真实数据（加载时间、请求数、样本生成速度）
+3. 逐步叠加优化，持续验证
+4. 最终形成基于实测的性能报告
+
+**预期目标**（待验证）：
+- 10K 样本：< 1 小时
+- 100K 样本：< 10 小时
 
 ---
 
