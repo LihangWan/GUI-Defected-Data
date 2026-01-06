@@ -1,0 +1,50 @@
+{
+  "id": "vis_9120a81d",
+  "url": "https://docs.python.org/3/",
+  "bug_type": "Layout_Overlap",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "a",
+    "text": "all \"What's new\" documents since Python 2.0",
+    "aria_label": "",
+    "id": "",
+    "class": "",
+    "role": "",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "\u94fe\u63a5"
+  },
+  "bbox_before": {
+    "x": 448.125,
+    "y": 262.203125,
+    "width": 278.4375,
+    "height": 20
+  },
+  "bbox_after": {
+    "x": 498.125,
+    "y": 302.203125,
+    "width": 278.4375,
+    "height": 20
+  },
+  "bbox_before_norm": {
+    "x": 0.2333984375,
+    "y": 0.2427806712962963,
+    "width": 0.14501953125,
+    "height": 0.018518518518518517
+  },
+  "bbox_after_norm": {
+    "x": 0.2594401041666667,
+    "y": 0.27981770833333336,
+    "width": 0.14501953125,
+    "height": 0.018518518518518517
+  },
+  "expected_behavior": "\u5143\u7d20\u5e94\u4f4d\u4e8e\u6b63\u786e\u7684\u4f4d\u7f6e\uff0c\u4e0d\u4e0e\u5176\u4ed6\u5185\u5bb9\u91cd\u53e0",
+  "diff_score": 10.361973341569165,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:57:31.652097",
+  "scroll_y": 0
+}

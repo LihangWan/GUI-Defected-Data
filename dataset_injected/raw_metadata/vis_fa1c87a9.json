@@ -1,0 +1,50 @@
+{
+  "id": "vis_fa1c87a9",
+  "url": "https://www.apache.org/",
+  "bug_type": "Layout_Overlap",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "div",
+    "text": "DECEMBER 19, 2025\nASF 2025 Year In Review: Building For Resilience And Growth\nRead Post",
+    "aria_label": "",
+    "id": "",
+    "class": "blog-card text-left",
+    "role": "",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "div.blog-card"
+  },
+  "bbox_before": {
+    "x": 760.171875,
+    "y": 340.6875,
+    "width": 366.671875,
+    "height": 250
+  },
+  "bbox_after": {
+    "x": 810.171875,
+    "y": 300.6875,
+    "width": 366.671875,
+    "height": 250
+  },
+  "bbox_before_norm": {
+    "x": 0.3959228515625,
+    "y": 0.3154513888888889,
+    "width": 0.19097493489583334,
+    "height": 0.23148148148148148
+  },
+  "bbox_after_norm": {
+    "x": 0.42196451822916664,
+    "y": 0.27841435185185187,
+    "width": 0.19097493489583334,
+    "height": 0.23148148148148148
+  },
+  "expected_behavior": "\u5143\u7d20\u5e94\u4f4d\u4e8e\u6b63\u786e\u7684\u4f4d\u7f6e\uff0c\u4e0d\u4e0e\u5176\u4ed6\u5185\u5bb9\u91cd\u53e0",
+  "diff_score": 51.59074098740265,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:56:00.915206",
+  "scroll_y": 4130
+}

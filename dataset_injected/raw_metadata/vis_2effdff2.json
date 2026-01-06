@@ -1,0 +1,50 @@
+{
+  "id": "vis_2effdff2",
+  "url": "https://www.apache.org/",
+  "bug_type": "Text_Overflow",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "a",
+    "text": "Our Sponsors",
+    "aria_label": "",
+    "id": "",
+    "class": "",
+    "role": "menuitem",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "\"Our Sponsors\""
+  },
+  "bbox_before": {
+    "x": 1345.15625,
+    "y": 450.453125,
+    "width": 168.328125,
+    "height": 32
+  },
+  "bbox_after": {
+    "x": 787.65625,
+    "y": 396.453125,
+    "width": 5047.484375,
+    "height": 32
+  },
+  "bbox_before_norm": {
+    "x": 0.7006022135416666,
+    "y": 0.41708622685185187,
+    "width": 0.0876708984375,
+    "height": 0.02962962962962963
+  },
+  "bbox_after_norm": {
+    "x": 0.4102376302083333,
+    "y": 0.3670862268518518,
+    "width": 2.628898111979167,
+    "height": 0.02962962962962963
+  },
+  "expected_behavior": "\u6587\u672c\u5e94\u5b8c\u6574\u663e\u793a\u5728\u5bb9\u5668\u5185\uff0c\u4e0d\u5e94\u6ea2\u51fa\u6216\u88ab\u622a\u65ad",
+  "diff_score": 65.91796497121824,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:56:22.505350",
+  "scroll_y": 6882
+}

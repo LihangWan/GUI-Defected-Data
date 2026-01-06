@@ -1,0 +1,50 @@
+{
+  "id": "vis_a5ba36f0",
+  "url": "https://www.eclipse.org/",
+  "bug_type": "Layout_Alignment",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "p",
+    "text": "We are a community of communities, bringing together developers, organisations, and innovators from ...",
+    "aria_label": "",
+    "id": "",
+    "class": "",
+    "role": "",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "\u6bb5\u843d"
+  },
+  "bbox_before": {
+    "x": 531,
+    "y": 487.28125,
+    "width": 825,
+    "height": 77.109375
+  },
+  "bbox_after": {
+    "x": 531,
+    "y": 487.28125,
+    "width": 825,
+    "height": 77.109375
+  },
+  "bbox_before_norm": {
+    "x": 0.2765625,
+    "y": 0.4511863425925926,
+    "width": 0.4296875,
+    "height": 0.07139756944444445
+  },
+  "bbox_after_norm": {
+    "x": 0.2765625,
+    "y": 0.4511863425925926,
+    "width": 0.4296875,
+    "height": 0.07139756944444445
+  },
+  "expected_behavior": "\u5143\u7d20\u5e94\u6309\u8bbe\u8ba1\u89c4\u8303\u5bf9\u9f50\uff0c\u4fdd\u6301\u89c6\u89c9\u4e00\u81f4\u6027",
+  "diff_score": 82.09945192569006,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:58:52.394046",
+  "scroll_y": 614
+}

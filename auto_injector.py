@@ -5,7 +5,7 @@ import random
 import uuid
 import math
 from datetime import datetime
-from PIL import Image, ImageChops  # 新增依赖
+from PIL import Image, ImageChops, ImageDraw, ImageFont  # 新增 ImageDraw, ImageFont
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -58,6 +58,168 @@ class AutoInjector:
             }
         except:
             return {"x": 0.0, "y": 0.0, "width": 0.0, "height": 0.0}
+    
+    def _extract_semantic_info(self, element):
+        """提取元素的语义信息（关键创新：零成本标注）"""
+        try:
+            semantic = {
+                "tag": element.tag_name.lower(),
+                "text": "",
+                "aria_label": "",
+                "id": "",
+                "class": "",
+                "role": "",
+                "placeholder": "",
+                "type": "",
+                "name": ""
+            }
+            
+            # 提取文本内容（截断长文本）
+            try:
+                text = element.text.strip()
+                if len(text) > 100:
+                    text = text[:100] + "..."
+                semantic["text"] = text
+            except: pass
+            
+            # 提取属性
+            for attr in ["aria-label", "id", "class", "role", "placeholder", "type", "name"]:
+                try:
+                    val = element.get_attribute(attr)
+                    if val:
+                        key = attr.replace("-", "_")
+                        semantic[key] = str(val)[:100]  # 截断
+                except: pass
+            
+            # 如果没有 text 但有 value（如 input）
+            if not semantic["text"]:
+                try:
+                    value = element.get_attribute("value")
+                    if value:
+                        semantic["text"] = value[:100]
+                except: pass
+            
+            # 生成人类可读的描述（用于模板填充）
+            semantic["readable_name"] = self._generate_readable_name(semantic)
+            
+            return semantic
+        except Exception as e:
+            return {"tag": "unknown", "readable_name": "页面元素"}
+    
+    def _generate_readable_name(self, semantic):
+        """从语义信息生成人类可读的元素名称"""
+        # 优先级：text > aria-label > id > class > tag
+        if semantic.get("text") and len(semantic["text"]) < 30:
+            return f'"{semantic["text"]}"按钮' if semantic["tag"] == "button" else f'"{semantic["text"]}"'
+        if semantic.get("aria_label"):
+            return f'"{semantic["aria_label"]}"'
+        if semantic.get("placeholder"):
+            return f'输入框（{semantic["placeholder"]}）'
+        if semantic.get("id"):
+            return f'{semantic["tag"]}#{semantic["id"]}'
+        if semantic.get("class"):
+            classes = semantic["class"].split()[0]  # 只取第一个类名
+            return f'{semantic["tag"]}.{classes}'
+        
+        # 回退到标签类型
+        tag_names = {
+            "button": "按钮",
+            "a": "链接",
+            "input": "输入框",
+            "img": "图片",
+            "h1": "标题",
+            "h2": "二级标题",
+            "h3": "三级标题",
+            "p": "段落",
+            "div": "容器",
+            "span": "文本",
+            "select": "下拉框",
+            "textarea": "文本域"
+        }
+        return tag_names.get(semantic.get("tag"), semantic.get("tag", "元素"))
+    
+    def _get_expected_behavior(self, bug_type):
+        """[改进 3] 为每种 Bug 类型定义预期行为（Ground Truth）"""
+        behaviors = {
+            "Layout_Overlap": "元素应位于正确的位置，不与其他内容重叠",
+            "Element_Missing": "关键元素应当可见，用户应能正常交互",
+            "Text_Overflow": "文本应完整显示在容器内，不应溢出或被截断",
+            "Broken_Image": "图片应正常加载并显示",
+            "Layout_Alignment": "元素应按设计规范对齐，保持视觉一致性",
+            "Layout_Spacing": "元素间距应统一，符合设计系统规范",
+            "Data_Format_Error": "数据应以正确的格式展示（日期、数字、货币等）",
+            "Style_Color_Contrast": "文本与背景的对比度应≥4.5:1（WCAG AA标准）",
+            "Style_Size_Inconsistent": "同类元素的尺寸应保持一致"
+        }
+        return behaviors.get(bug_type, "元素应正常工作")
+    
+    def _draw_action_marker(self, image_path, bbox, action_type="click", output_path=None):
+        """[改进 3] 在截图上绘制动作标记（红点/箭头）用于交互类 Bug
+        
+        Args:
+            image_path: 原始截图路径
+            bbox: 元素坐标 {"x", "y", "width", "height"}
+            action_type: "click" | "hover" | "type"
+            output_path: 输出路径（默认覆盖原图）
+        
+        Returns:
+            标记后的图片路径
+        """
+        try:
+            img = Image.open(image_path)
+            draw = ImageDraw.Draw(img)
+            
+            # 计算元素中心点
+            center_x = int(bbox["x"] + bbox["width"] / 2)
+            center_y = int(bbox["y"] + bbox["height"] / 2)
+            
+            if action_type == "click":
+                # 绘制红色圆点（模拟鼠标点击）
+                radius = 10
+                draw.ellipse(
+                    [center_x - radius, center_y - radius, 
+                     center_x + radius, center_y + radius],
+                    fill=(255, 0, 0),  # 红色填充
+                    outline=(255, 255, 255),  # 白色边框
+                    width=3
+                )
+                # 内部小圆（增强视觉效果）
+                inner_radius = 3
+                draw.ellipse(
+                    [center_x - inner_radius, center_y - inner_radius,
+                     center_x + inner_radius, center_y + inner_radius],
+                    fill=(255, 255, 255)
+                )
+            
+            elif action_type == "hover":
+                # 绘制黄色光晕（模拟悬停）
+                radius = 12
+                draw.ellipse(
+                    [center_x - radius, center_y - radius,
+                     center_x + radius, center_y + radius],
+                    fill=(255, 255, 0, 100),  # 半透明黄色
+                    outline=(255, 200, 0),
+                    width=2
+                )
+            
+            elif action_type == "type":
+                # 绘制蓝色光标（模拟输入）
+                cursor_height = 20
+                draw.rectangle(
+                    [center_x - 1, center_y - cursor_height // 2,
+                     center_x + 1, center_y + cursor_height // 2],
+                    fill=(0, 0, 255)
+                )
+            
+            # 保存
+            if not output_path:
+                output_path = image_path
+            img.save(output_path)
+            return output_path
+            
+        except Exception as e:
+            print(f"[!] 绘制动作标记失败: {e}")
+            return image_path
 
     def _setup_driver(self):
         """初始化无头浏览器"""
@@ -409,7 +571,7 @@ class AutoInjector:
 
             elif bug_type == "Style_Color_Contrast":
                 # 故意降低文本与背景的对比度：使用更激进的方式让文本难以阅读
-                script = f"""
+                script = fr"""
                 (function(el) {{
                     el.offsetHeight;
                     const cs = window.getComputedStyle(el);
@@ -424,7 +586,7 @@ class AutoInjector:
                     el.style.cssText += '; color: ' + textColor + ' !important; text-shadow: none !important; opacity: 0.6 !important;';
                     el.offsetHeight;
                     {visual_aid}
-                }})( arguments[0]);
+                }})(arguments[0]);
                 """
                 self.driver.execute_script(script, element)
 
@@ -475,8 +637,16 @@ class AutoInjector:
         inter_area = max(0, x2 - x1) * max(0, y2 - y1)
         return (inter_area / (bbox['width'] * bbox['height'])) > 0.5
 
-    def save_dataset_pair(self, url):
-        pair_id = str(uuid.uuid4())[:8]
+    def save_dataset_pair(self, url, bug_category="visual"):
+        """生成一对 normal + buggy 的训练样本
+        
+        Args:
+            url: 目标网站
+            bug_category: 'visual' 或 'interaction'
+        """
+        # [改进 2] 文件命名：vis_ 或 int_ 前缀
+        prefix = "vis" if bug_category == "visual" else "int"
+        pair_id = f"{prefix}_{str(uuid.uuid4().hex[:8])}"
         max_retries = 3
         
         # 每次生成前先清理环境
@@ -490,6 +660,9 @@ class AutoInjector:
                 if not candidates: break
                 
                 target = random.choice(candidates)
+                
+                # [改进 1] 提取语义信息（零成本标注的核心）
+                semantic_info = self._extract_semantic_info(target)
                 
                 # --- Normal 截图 ---
                 self.scroll_to_element(target)
@@ -543,6 +716,11 @@ class AutoInjector:
                 # [视觉类 Bug] 保存 buggy 截图
                 buggy_path = os.path.join(IMG_DIR, f"{pair_id}_buggy.png")
                 self.driver.save_screenshot(buggy_path)
+                # [改进 2] 生成带动作标记的截图（红点），让 VLM 明确交互位置
+                try:
+                    self._draw_action_marker(buggy_path, overlay_bbox, action_type="click", output_path=buggy_path)
+                except Exception as e:
+                    print(f"[!] 标记动作失败: {e}")
                 # 截图后立即移除覆盖层
                 try:
                     self._remove_debug_overlay()
@@ -572,10 +750,21 @@ class AutoInjector:
                         "id": pair_id,
                         "url": url,
                         "bug_type": info['type'],
+                        "bug_category": bug_category,
+                        
+                        # [改进 1] 语义信息（零成本标注的核心）
+                        "element_semantic": semantic_info,
+                        
+                        # 坐标信息
                         "bbox_before": normal_bbox,
                         "bbox_after": bbox_after,
                         "bbox_before_norm": self._normalize_bbox(normal_bbox),
                         "bbox_after_norm": self._normalize_bbox(bbox_after),
+                        
+                        # 预期行为（Ground Truth）
+                        "expected_behavior": self._get_expected_behavior(info['type']),
+                        
+                        # 验证指标
                         "diff_score": diff_score,
                         "image_size": VIEWPORT_SIZE,
                         "timestamp": str(datetime.now()),

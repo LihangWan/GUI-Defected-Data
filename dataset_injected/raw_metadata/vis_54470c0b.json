@@ -1,0 +1,50 @@
+{
+  "id": "vis_54470c0b",
+  "url": "https://www.eclipse.org/",
+  "bug_type": "Layout_Spacing",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "div",
+    "text": "Community newsletter\nDecember 2025 Community Newsletter Read more\nabout Community newsletter\nFeature...",
+    "aria_label": "",
+    "id": "",
+    "class": "showcase",
+    "role": "",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "div.showcase"
+  },
+  "bbox_before": {
+    "x": 373.5,
+    "y": 331.546875,
+    "width": 1140,
+    "height": 877.5
+  },
+  "bbox_after": {
+    "x": 373.5,
+    "y": 87.546875,
+    "width": 1140,
+    "height": 877.5
+  },
+  "bbox_before_norm": {
+    "x": 0.19453125,
+    "y": 0.3069878472222222,
+    "width": 0.59375,
+    "height": 0.8125
+  },
+  "bbox_after_norm": {
+    "x": 0.19453125,
+    "y": 0.0810619212962963,
+    "width": 0.59375,
+    "height": 0.8125
+  },
+  "expected_behavior": "\u5143\u7d20\u95f4\u8ddd\u5e94\u7edf\u4e00\uff0c\u7b26\u5408\u8bbe\u8ba1\u7cfb\u7edf\u89c4\u8303",
+  "diff_score": 88.18869958386786,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:59:20.651386",
+  "scroll_y": 2425
+}

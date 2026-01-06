@@ -1,0 +1,50 @@
+{
+  "id": "vis_de7acbb1",
+  "url": "https://en.wikipedia.org/wiki/Software_testing",
+  "bug_type": "Text_Overflow",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "p",
+    "text": "Some might argue that, for SRS, the input is the words of stakeholders and, therefore, SRS validatio...",
+    "aria_label": "",
+    "id": "",
+    "class": "",
+    "role": "",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "\u6bb5\u843d"
+  },
+  "bbox_before": {
+    "x": 469.5,
+    "y": 426.921875,
+    "width": 948,
+    "height": 78
+  },
+  "bbox_after": {
+    "x": 469.5,
+    "y": 426.921875,
+    "width": 948,
+    "height": 26
+  },
+  "bbox_before_norm": {
+    "x": 0.24453125,
+    "y": 0.3952980324074074,
+    "width": 0.49375,
+    "height": 0.07222222222222222
+  },
+  "bbox_after_norm": {
+    "x": 0.24453125,
+    "y": 0.3952980324074074,
+    "width": 0.49375,
+    "height": 0.024074074074074074
+  },
+  "expected_behavior": "\u6587\u672c\u5e94\u5b8c\u6574\u663e\u793a\u5728\u5bb9\u5668\u5185\uff0c\u4e0d\u5e94\u6ea2\u51fa\u6216\u88ab\u622a\u65ad",
+  "diff_score": 75.07736014393943,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:58:03.830485",
+  "scroll_y": 15709
+}

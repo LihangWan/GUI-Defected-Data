@@ -1,0 +1,50 @@
+{
+  "id": "vis_bf8ebd95",
+  "url": "https://www.w3.org/",
+  "bug_type": "Element_Missing",
+  "bug_category": "visual",
+  "element_semantic": {
+    "tag": "p",
+    "text": "The World Wide Web Consortium (W3C) develops standards and guidelines to help everyone build a web b...",
+    "aria_label": "",
+    "id": "",
+    "class": "",
+    "role": "",
+    "placeholder": "",
+    "type": "",
+    "name": "",
+    "readable_name": "\u6bb5\u843d"
+  },
+  "bbox_before": {
+    "x": 383.5,
+    "y": 378.171875,
+    "width": 504,
+    "height": 160.9375
+  },
+  "bbox_after": {
+    "x": 383.5,
+    "y": 378.171875,
+    "width": 504,
+    "height": 160.9375
+  },
+  "bbox_before_norm": {
+    "x": 0.19973958333333333,
+    "y": 0.3501591435185185,
+    "width": 0.2625,
+    "height": 0.1490162037037037
+  },
+  "bbox_after_norm": {
+    "x": 0.19973958333333333,
+    "y": 0.3501591435185185,
+    "width": 0.2625,
+    "height": 0.1490162037037037
+  },
+  "expected_behavior": "\u5173\u952e\u5143\u7d20\u5e94\u5f53\u53ef\u89c1\uff0c\u7528\u6237\u5e94\u80fd\u6b63\u5e38\u4ea4\u4e92",
+  "diff_score": 51.74348701161355,
+  "image_size": [
+    1920,
+    1080
+  ],
+  "timestamp": "2026-01-06 11:55:20.652399",
+  "scroll_y": 110
+}

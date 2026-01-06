@@ -110,7 +110,7 @@ def generate_visual_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
     从原始元数据生成视觉类 Bug 的自然语言报告
     
     Args:
-        metadata: 从 raw_metadata/{uuid}.json 读取的数据
+        metadata: 从 raw_metadata/vis_{uuid}.json 读取的数据
     
     Returns:
         适用于 SFT 训练的对话格式数据
@@ -118,8 +118,12 @@ def generate_visual_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
     bug_type = metadata.get("bug_type", "Unknown")
     bbox = metadata.get("bbox_before", {})
     
-    # 生成元素描述
-    element_desc = _generate_element_description(metadata)
+    # [改进 1] 使用语义信息生成准确描述
+    semantic = metadata.get("element_semantic", {})
+    element_desc = semantic.get("readable_name", "页面元素")
+    
+    # [改进 3] 获取预期行为（Ground Truth）
+    expected_behavior = metadata.get("expected_behavior", "")
     
     # 获取模板
     template = VISUAL_BUG_TEMPLATES.get(bug_type)
@@ -134,13 +138,27 @@ def generate_visual_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
         y=int(bbox.get("y", 0))
     )
     
-    # 组装完整报告
-    full_report = f"{detection}\n\n{template['impact']}\n\n{template['suggestion']}"
+    # 组装完整报告（包含预期行为）
+    full_report = f"{detection}\n\n影响分析：{template['impact']}\n\n预期行为：{expected_behavior}\n\n修复建议：{template['suggestion']}"
+    
+    # [改进] 添加详细的元素信息用于调试
+    element_details = ""
+    if semantic.get("text"):
+        element_details += f"\n- 元素文本: {semantic['text']}"
+    if semantic.get("id"):
+        element_details += f"\n- 元素ID: {semantic['id']}"
+    if semantic.get("class"):
+        element_details += f"\n- 元素类名: {semantic['class']}"
+    
+    if element_details:
+        full_report += f"\n\n元素详情：{element_details}"
     
     # 构建 SFT 对话格式
+    bug_cat = metadata.get("bug_category", "visual")
+    img_subdir = "visual" if bug_cat == "visual" else "interaction"
     conversation = {
         "id": metadata.get("id"),
-        "image": f"images/visual/{metadata['id']}_buggy.png",
+        "image": f"images/{img_subdir}/{metadata['id']}_buggy.png",  # 使用实际的文件名
         "conversations": [
             {
                 "from": "human",
@@ -155,7 +173,9 @@ def generate_visual_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
             "bug_type": bug_type,
             "url": metadata.get("url"),
             "bbox": bbox,
-            "diff_score": metadata.get("diff_score")
+            "diff_score": metadata.get("diff_score"),
+            "element_semantic": semantic,  # 保留语义信息用于分析
+            "expected_behavior": expected_behavior  # Ground Truth
         }
     }
     
@@ -163,9 +183,13 @@ def generate_visual_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _generate_element_description(metadata: Dict[str, Any]) -> str:
-    """生成元素的自然语言描述"""
-    # 这里可以从元数据中提取元素信息
-    # 当前版本简化处理，未来可扩展
+    """生成元素的自然语言描述（已废弃，改用 semantic info）"""
+    # 优先使用语义信息
+    semantic = metadata.get("element_semantic", {})
+    if semantic.get("readable_name"):
+        return semantic["readable_name"]
+    
+    # 回退逻辑（兼容旧数据）
     bug_type = metadata.get("bug_type")
     
     # 根据 bug 类型推断可能的元素
@@ -202,36 +226,76 @@ def _generate_fallback_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# ===================== 交互类 Bug 报告 =====================
+
+def generate_interaction_report(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    """生成交互类（interaction）Bug 的对话数据"""
+    bug_type = metadata.get("bug_type", "Unknown")
+    elem = metadata.get("element_semantic", {})
+    readable = elem.get("readable_name", "interactive element")
+    expected = metadata.get("expected_behavior", "Action should complete successfully.")
+    desc = metadata.get("description", "Action failed.")
+    action_trace = metadata.get("action_trace", {})
+    img_paths = metadata.get("images", {})
+
+    # 选择 action 视图作为主图（含红点）
+    image_rel = img_paths.get("action") or img_paths.get("end") or img_paths.get("start")
+
+    prompt = (
+        "你是前端 QA，请根据截图判断交互缺陷，并给出预期与实际结果。"
+    )
+    answer = (
+        f"检测到交互缺陷：{bug_type}，目标元素 {readable}。\n"
+        f"预期行为：{expected}\n"
+        f"实际结果：{desc}"
+    )
+
+    # 追加动作细节
+    if action_trace:
+        answer += f"\n动作信息：{action_trace.get('action', 'click')} at {action_trace.get('coordinates')}"
+
+    return {
+        "id": metadata.get("id"),
+        "image": image_rel,
+        "conversations": [
+            {"from": "human", "value": prompt},
+            {"from": "assistant", "value": answer},
+        ],
+        "metadata": {
+            "bug_category": "interaction",
+            "bug_type": bug_type,
+            "url": metadata.get("url"),
+            "expected_behavior": expected,
+            "action_trace": action_trace,
+        },
+    }
+
+
 # ===================== 批量处理 =====================
 
 def process_all_metadata(raw_metadata_dir: str, output_jsonl: str):
     """
-    批量处理所有原始元数据，生成训练数据
-    
-    Args:
-        raw_metadata_dir: raw_metadata/ 目录路径
-        output_jsonl: 输出的 JSONL 文件路径（如 train_sft.jsonl）
+    批量处理所有原始元数据，生成训练数据（视觉 + 交互）
     """
     results = []
     
-    # 遍历所有 JSON 文件
     for filename in os.listdir(raw_metadata_dir):
         if not filename.endswith(".json"):
             continue
-        
         filepath = os.path.join(raw_metadata_dir, filename)
         with open(filepath, "r", encoding="utf-8") as f:
             metadata = json.load(f)
-        
-        # 生成报告
-        conversation = generate_visual_report(metadata)
-        results.append(conversation)
+
+        bug_cat = metadata.get("bug_category", "visual")
+        if bug_cat == "interaction":
+            conv = generate_interaction_report(metadata)
+        else:
+            conv = generate_visual_report(metadata)
+        results.append(conv)
     
-    # 写入 JSONL 文件（每行一个 JSON）
     with open(output_jsonl, "w", encoding="utf-8") as f:
         for item in results:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
-    
     print(f"✅ 已生成 {len(results)} 条训练数据 → {output_jsonl}")
 
 
