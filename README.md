@@ -66,19 +66,17 @@ pip install selenium pillow webdriver-manager
 ### 基本使用
 
 ```bash
-# 1. 编辑配置
-# 修改 auto_injector.py 顶部的配置：
-# - DEBUG_MODE = True（调试）或 False（生产）
-# - TARGET_URLS = [列表]（目标网站）
-
-# 2. 运行脚本
+# 1. 运行数据生成
 python auto_injector.py
+
+# 2. 生成训练数据（自然语言报告）
+python templates.py generate
 
 # 3. 查看输出
 ls dataset_injected/
-  ├── images/           # 截图对（normal_*.png + buggy_*.png）
-  ├── labels/          # 目标检测标签（YOLO 格式）
-  └── metadata/        # JSON 元数据（bug 类型、坐标、验证指标）
+  ├── images/visual/       # 截图对（normal + buggy）
+  ├── raw_metadata/        # 原始 JSON
+  └── training_data/       # SFT 训练数据
 ```
 
 ### 配置说明
@@ -109,20 +107,26 @@ TARGET_URLS = [
 
 ```
 dataset_injected/
-├── images/
-│   ├── normal_<uuid>.png          # 正常截图
-│   ├── buggy_<uuid>.png           # bug 注入后的截图
-│   └── ...（成对出现）
-├── labels/
-│   ├── <uuid>.txt                 # YOLO 格式标签
-│   │  (class center_x center_y width height)
-│   └── ...
-└── metadata/
-    ├── <uuid>.json                # 样本元数据
-    └── ...
+├── images/                        # 统一存放所有图片
+│   ├── visual/                    # 视觉类 Bug 图片
+│   │   ├── {uuid}_normal.png      # 正常截图
+│   │   └── {uuid}_buggy.png       # bug 注入后的截图
+│   └── interaction/               # 交互类 Bug 图片序列（未来支持）
+│       ├── {uuid}_step1_start.png # 初始状态
+│       ├── {uuid}_step1_act.png   # 动作标注图
+│       └── {uuid}_step2_end.png   # 结果状态
+├── labels/                        # YOLO 格式标签（可选）
+│   └── {uuid}.txt
+├── raw_metadata/                  # 原始元数据（中间产物）
+│   └── {uuid}.json
+└── training_data/                 # 最终训练数据（SFT 格式）
+    ├── train_sft.jsonl            # 训练集
+    └── test_sft.jsonl             # 测试集
 ```
 
 ### 元数据格式
+
+**raw_metadata/{uuid}.json** 格式：
 
 ```json
 {
@@ -131,8 +135,8 @@ dataset_injected/
   "bug_type": "Layout_Overlap",
   "viewport": { "x": 1920, "y": 1080 },
   
-  "normal_image": "normal_abc12345.png",
-  "buggy_image": "buggy_abc12345.png",
+  "normal_image": "images/visual/abc12345_normal.png",
+  "buggy_image": "images/visual/abc12345_buggy.png",
   
   "element_info": {
     "tag": "button",
@@ -158,6 +162,15 @@ dataset_injected/
   
   "timestamp": "2025-01-06T10:30:45Z"
 }
+```
+
+**training_data/train_sft.jsonl** 格式（用于 MLLM 微调）：
+
+```jsonl
+{"id": "abc12345", "image": "images/visual/abc12345_buggy.png", "conversations": [
+  {"from": "human", "value": "请分析这个网页截图，判断是否存在 UI 缺陷，并给出详细的问题描述。"},
+  {"from": "assistant", "value": "检测到布局重叠缺陷：导航栏按钮在坐标(150, 200)位置与周围内容发生遮挡。\n\n影响用户体验，导致内容难以阅读或交互受阻。\n\n建议检查该元素的 CSS 定位属性（transform/position），确保不与其他元素产生遮挡。"}
+], "metadata": {"bug_type": "Layout_Overlap", "url": "https://www.w3.org/", "bbox": {...}}}
 ```
 
 ---
@@ -339,8 +352,8 @@ A: 参考 DATASET_COMBINED_PLAN.md 的优化方案：
 
 | 文档 | 用途 |
 |------|------|
-| [DATASET_COMBINED_PLAN.md](DATASET_COMBINED_PLAN.md) | 完整的技术方案（优化策略、多站点加载、并发控制等） |
 | [IMPROVEMENTS.md](IMPROVEMENTS.md) | 改进措施列表（基于论文洞察 + 代码分析） |
+| [templates.py](templates.py) | 自然语言报告生成模板库 |
 | [auto_injector.py](auto_injector.py) | 核心脚本（自动注入实现） |
 
 ---

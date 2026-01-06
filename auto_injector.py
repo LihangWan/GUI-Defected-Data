@@ -22,9 +22,9 @@ from selenium.webdriver.chrome.options import Options
 DEBUG_MODE = True  
 
 OUTPUT_DIR = "dataset_injected"
-IMG_DIR = os.path.join(OUTPUT_DIR, "images")
+IMG_DIR = os.path.join(OUTPUT_DIR, "images", "visual")  # 视觉类 Bug 图片
 LBL_DIR = os.path.join(OUTPUT_DIR, "labels")
-META_DIR = os.path.join(OUTPUT_DIR, "metadata")
+META_DIR = os.path.join(OUTPUT_DIR, "raw_metadata")  # 原始元数据
 
 # 模拟的视口大小 (PC端)
 VIEWPORT_SIZE = (1920, 1080)
@@ -500,6 +500,7 @@ class AutoInjector:
                 # 记录滚动位置用于锁定
                 scroll_y = self.get_scroll_y()
 
+                # [视觉类 Bug] 保存 normal 截图
                 normal_path = os.path.join(IMG_DIR, f"{pair_id}_normal.png")
                 self.driver.save_screenshot(normal_path)
                 
@@ -539,6 +540,7 @@ class AutoInjector:
                 except:
                     pass
                 
+                # [视觉类 Bug] 保存 buggy 截图
                 buggy_path = os.path.join(IMG_DIR, f"{pair_id}_buggy.png")
                 self.driver.save_screenshot(buggy_path)
                 # 截图后立即移除覆盖层
