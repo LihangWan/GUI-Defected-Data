@@ -1,0 +1,35 @@
+{
+  "id": "int_215de95d",
+  "bug_category": "interaction",
+  "bug_type": "Validation_Error",
+  "description": "Validation error triggered but no input field found on page.",
+  "expected_behavior": "Input should accept valid values and only show errors for invalid data.",
+  "url": "https://docs.python.org/3/#",
+  "element_semantic": {
+    "tag": "a",
+    "text": "3.14.2 Documentation",
+    "id": "",
+    "class": "",
+    "aria_label": "",
+    "bbox": {
+      "x": 477.75,
+      "y": 1056.765625,
+      "width": 139.828125,
+      "height": 20
+    },
+    "readable_name": "\"3.14.2 Documentation\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      547,
+      736
+    ],
+    "target_readable": "\"3.14.2 Documentation\""
+  },
+  "images": {
+    "action": "images/interaction/int_215de95d_action.png",
+    "end": "images/interaction/int_215de95d_end.png"
+  },
+  "timestamp": "2026-01-06 14:51:19.852280"
+}

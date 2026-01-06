@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # ========================================
+  # OWASP Juice Shop - 电商应用 (测试平台)
+  # ========================================
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: juice-shop
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+    volumes:
+      - juice-shop-data:/juice-shop/ftp
+    networks:
+      - web-arena
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # WordPress - CMS/博客应用 (表单丰富)
+  # ========================================
+  wordpress:
+    image: wordpress:latest
+    container_name: wordpress
+    ports:
+      - "8080:80"
+    environment:
+      WORDPRESS_DB_HOST: wp-db
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress123
+      WORDPRESS_DEBUG: "true"
+      WORDPRESS_DEBUG_LOG: /var/www/html/wp-content/debug.log
+    depends_on:
+      - wp-db
+    volumes:
+      - wordpress-data:/var/www/html
+    networks:
+      - web-arena
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wp-db:
+    image: mysql:8.0
+    container_name: wordpress-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress123
+    volumes:
+      - wp-db-data:/var/lib/mysql
+    networks:
+      - web-arena
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ========================================
+  # 可选: GitLab CE (开发协作平台)
+  # 注: 资源较重 (4GB+ RAM)，可注释掉
+  # ========================================
+  # gitlab:
+  #   image: gitlab/gitlab-ce:latest
+  #   container_name: gitlab
+  #   hostname: gitlab.local
+  #   ports:
+  #     - "8081:80"
+  #     - "8022:22"
+  #   environment:
+  #     GITLAB_OMNIBUS_CONFIG: |
+  #       external_url 'http://gitlab.local'
+  #   volumes:
+  #     - gitlab-config:/etc/gitlab
+  #     - gitlab-logs:/var/log/gitlab
+  #     - gitlab-data:/var/opt/gitlab
+  #   networks:
+  #     - web-arena
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+
+volumes:
+  juice-shop-data:
+  wordpress-data:
+  wp-db-data:
+  # gitlab-config:
+  # gitlab-logs:
+  # gitlab-data:
+
+networks:
+  web-arena:
+    driver: bridge

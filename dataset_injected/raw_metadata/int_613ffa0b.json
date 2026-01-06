@@ -1,0 +1,35 @@
+{
+  "id": "int_613ffa0b",
+  "bug_category": "interaction",
+  "bug_type": "Operation_No_Response",
+  "description": "Click initiated request but network was intercepted; no response received.",
+  "expected_behavior": "Click should complete and receive server response within reasonable time.",
+  "url": "https://www.w3.org/blog/2025/tpac-2025-breakouts-recap/",
+  "element_semantic": {
+    "tag": "a",
+    "text": "TPAC 2025 Breakouts recap",
+    "id": "",
+    "class": "card__link",
+    "aria_label": "",
+    "bbox": {
+      "x": 963.8125,
+      "y": 3074.953125,
+      "width": 187.203125,
+      "height": 53
+    },
+    "readable_name": "\"TPAC 2025 Breakouts recap\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1049,
+      466
+    ],
+    "target_readable": "\"TPAC 2025 Breakouts recap\""
+  },
+  "images": {
+    "action": "images/interaction/int_613ffa0b_action.png",
+    "end": "images/interaction/int_613ffa0b_end.png"
+  },
+  "timestamp": "2026-01-06 14:50:30.082215"
+}

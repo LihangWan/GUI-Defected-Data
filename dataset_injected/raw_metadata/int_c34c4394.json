@@ -1,0 +1,35 @@
+{
+  "id": "int_c34c4394",
+  "bug_category": "interaction",
+  "bug_type": "Silent_Failure",
+  "description": "Request succeeded (200 OK) but response body was empty; operation silently failed.",
+  "expected_behavior": "Successful API response should return data; empty response indicates failure.",
+  "url": "https://www.apache.org/",
+  "element_semantic": {
+    "tag": "a",
+    "text": "Unknown Element",
+    "id": "",
+    "class": "",
+    "aria_label": "",
+    "bbox": {
+      "x": 761.15625,
+      "y": 1397.484375,
+      "width": 171.328125,
+      "height": 171.328125
+    },
+    "readable_name": "a"
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      846,
+      466
+    ],
+    "target_readable": "a"
+  },
+  "images": {
+    "action": "images/interaction/int_c34c4394_action.png",
+    "end": "images/interaction/int_c34c4394_end.png"
+  },
+  "timestamp": "2026-01-06 14:50:46.134162"
+}

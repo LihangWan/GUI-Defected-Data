@@ -1,0 +1,35 @@
+{
+  "id": "int_3a6cdc81",
+  "bug_category": "interaction",
+  "bug_type": "Validation_Error",
+  "description": "Validation error triggered but no input field found on page.",
+  "expected_behavior": "Input should accept valid values and only show errors for invalid data.",
+  "url": "https://www.debian.org/News/2025/2025090602",
+  "element_semantic": {
+    "tag": "a",
+    "text": "Updated Debian 12: 12.12 released",
+    "id": "",
+    "class": "",
+    "aria_label": "",
+    "bbox": {
+      "x": 427.75,
+      "y": 1538.046875,
+      "width": 283.03125,
+      "height": 25
+    },
+    "readable_name": "\"Updated Debian 12: 12.12 released\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      569,
+      465
+    ],
+    "target_readable": "\"Updated Debian 12: 12.12 released\""
+  },
+  "images": {
+    "action": "images/interaction/int_3a6cdc81_action.png",
+    "end": "images/interaction/int_3a6cdc81_end.png"
+  },
+  "timestamp": "2026-01-06 14:51:08.297835"
+}
