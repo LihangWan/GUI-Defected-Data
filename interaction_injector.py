@@ -550,7 +550,7 @@ class InteractionInjector:
             )
         except Exception:
             print("[!] 页面加载等待超时，继续执行")
-        time.sleep(2)
+        time.sleep(5)  # 增加等待时间从 2s → 5s，确保所有动态元素加载完成
         try:
             self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(0.5)
@@ -781,8 +781,8 @@ class InteractionInjector:
                 continue
         return candidates
 
-    def run_on_url(self, url: str, samples_per_site: int = 3):
-        """【改进】加入特征检测和智能权重选择"""
+    def run_on_url(self, url: str, samples_per_site: int = 15):
+        """【改进】加入特征检测和智能权重选择 - 增加采样数量到 15"""
         print(f"[*] Loading: {url}")
         self.driver.get(url)
         self._wait_page_ready()
@@ -805,9 +805,21 @@ class InteractionInjector:
             print("[-] No valid interactive elements, skip")
             return
 
-        # 【新】根据权重采样 Bug 类型
+        # 【新】根据权重采样 Bug 类型 - 确保权重均衡，各种 Bug 类型都有机会出现
         bug_choices = list(bug_weights.keys())
-        weights = list(bug_weights.values())
+        raw_weights = list(bug_weights.values())
+        
+        # 标准化权重：如果权重差异太大（比值 > 5），进行平衡处理
+        if raw_weights:
+            min_w = min(raw_weights)
+            max_w = max(raw_weights)
+            if max_w > 0 and min_w > 0 and max_w / min_w > 5:
+                # 权重差异过大，进行对数归一化
+                weights = [max(0.5, w * 0.5 + 1) for w in raw_weights]
+            else:
+                weights = raw_weights
+        else:
+            weights = [1.0] * len(bug_choices)
 
         for i in range(samples_per_site):
             try:
