@@ -845,8 +845,22 @@ class InteractionInjector:
     def execute_injection(self, element, bug_choice: str | None = None):
         """执行一次完整交互注入（网络层）"""
         uid = f"int_{uuid.uuid4().hex[:8]}"
-        bug_types = ["no_response", "nav_error", "fake_error", "timeout", "silent", "validation"]
-        bug_type_key = bug_choice or random.choice(bug_types)
+        
+        # 映射：从长名称到内部代码名称
+        bug_name_mapping = {
+            "Navigation_Error": "nav_error",
+            "Timeout_Hang": "timeout",
+            "Operation_No_Response": "no_response",
+            "Validation_Error": "validation",
+            "Unexpected_Task_Result": "fake_error",
+            "Silent_Failure": "silent",
+        }
+        
+        # 获取对应的内部名称
+        if bug_choice and bug_choice in bug_name_mapping:
+            bug_type_key = bug_name_mapping[bug_choice]
+        else:
+            bug_type_key = random.choice(list(bug_name_mapping.values()))
 
         try:
             elem_info = self._get_element_info(element)
