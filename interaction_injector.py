@@ -164,33 +164,35 @@ class PageFeatureDetector:
         return allowed
 
     def get_bug_priority(self) -> Dict[str, float]:
-        """获取 Bug 类型的注入权重"""
+        """获取 Bug 类型的注入权重 - 优化为更均衡的分布"""
         page_type = self.features.get("page_type", "static")
         input_count = self.features.get("input_count", 0)
 
+        # 基础权重：确保所有 Bug 类型都有合理的采样机会（最小 0.5）
         weights = {
             "Navigation_Error": 1.0,
             "Timeout_Hang": 1.0,
-            "Validation_Error": 0.1,
-            "Unexpected_Task_Result": 0.1,
-            "Operation_No_Response": 0.5,
-            "Silent_Failure": 0.1,
+            "Validation_Error": 1.0,  # 改为 0.1 → 1.0，确保有更多机会
+            "Unexpected_Task_Result": 1.0,  # 改为 0.1 → 1.0
+            "Operation_No_Response": 1.0,  # 改为 0.5 → 1.0
+            "Silent_Failure": 1.0,  # 改为 0.1 → 1.0
         }
 
-        # 根据页面类型调整
+        # 根据页面类型调整（增强特定 Bug，但保持最小权重）
         if page_type == "form_heavy":
-            weights["Validation_Error"] = 3.0
+            weights["Validation_Error"] = 3.0  # 表单多，更多验证错误
             weights["Unexpected_Task_Result"] = 2.0
-            weights["Silent_Failure"] = 2.0
+            weights["Silent_Failure"] = 1.5
 
         elif page_type == "ecommerce":
             weights["Validation_Error"] = 2.5
-            weights["Unexpected_Task_Result"] = 3.0
+            weights["Unexpected_Task_Result"] = 2.5
             weights["Operation_No_Response"] = 1.5
 
         elif page_type == "interactive":
-            weights["Operation_No_Response"] = 2.0
+            weights["Operation_No_Response"] = 1.5
             weights["Timeout_Hang"] = 1.5
+            # 即使在交互页面，其他 Bug 也有机会出现
 
         if input_count > 5:
             weights["Validation_Error"] *= 1.5
