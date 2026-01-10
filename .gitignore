@@ -29,6 +29,9 @@ dataset_injected/**/raw_metadata/
 !dataset_injected/labels/
 !dataset_injected/training_data/
 
+# Local backups (large, not for version control)
+backups/
+
 # Jupyter
 .ipynb_checkpoints/
 
