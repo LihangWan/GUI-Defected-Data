@@ -1,0 +1,41 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+*.env
+*.venv
+conda-env/
+
+# OS / Editor
+.DS_Store
+.vscode/
+.history/
+
+# Logs
+logs/
+*.log
+
+# Datasets (keep labels and training data, ignore heavy artifacts)
+dataset_injected/images/
+dataset_injected/**/images/
+dataset_injected/raw_metadata/
+dataset_injected/**/raw_metadata/
+!dataset_injected/labels/
+!dataset_injected/training_data/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Build / Dist
+build/
+dist/
+*.egg-info/
+
+# Docker / PIDs
+*.pid

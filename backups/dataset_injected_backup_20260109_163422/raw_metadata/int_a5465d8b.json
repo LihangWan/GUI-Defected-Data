@@ -1,0 +1,41 @@
+{
+  "id": "int_a5465d8b",
+  "bug_category": "interaction",
+  "bug_type": "Unexpected_Task_Result",
+  "bug_class": "Explicit_Error_Feedback",
+  "description": "API call returned 500 Internal Server Error; application error handler triggered.",
+  "expected_behavior": "API call should succeed (200 OK) without server errors.",
+  "url": "http://localhost:3000/#/search",
+  "element_semantic": {
+    "tag": "button",
+    "text": "OWASP Juice Shop",
+    "id": "",
+    "class": "mdc-button mat-mdc-button-base buttons mat-mdc-button mat-unthemed",
+    "aria_label": "Back to homepage",
+    "bbox": {
+      "x": 64,
+      "y": 6,
+      "width": 272.703125,
+      "height": 60
+    },
+    "readable_name": "\"OWASP Juice Shop\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      200,
+      36
+    ],
+    "target_readable": "\"OWASP Juice Shop\""
+  },
+  "images": {
+    "start": "images/interaction/int_a5465d8b_start.png",
+    "action": "images/interaction/int_a5465d8b_action.png",
+    "end": "images/interaction/int_a5465d8b_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 15:11:00.590018",
+  "injection_verified": false,
+  "has_network_logs": false
+}

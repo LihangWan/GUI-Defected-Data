@@ -1,0 +1,40 @@
+{
+  "id": "int_ca48725e",
+  "bug_category": "interaction",
+  "bug_type": "Timeout_Hang",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Network latency simulated (15s); application shows loading spinner.",
+  "expected_behavior": "Request should complete within 5-10 seconds, not hang indefinitely.",
+  "url": "http://localhost:3000/#/login",
+  "element_semantic": {
+    "tag": "a",
+    "text": "But me wait!",
+    "id": "",
+    "class": "cc-link",
+    "aria_label": "learn more about cookies",
+    "bbox": {
+      "x": 1521.1875,
+      "y": 810.9375,
+      "width": 97.40625,
+      "height": 30.375
+    },
+    "readable_name": "\"But me wait!\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1569,
+      826
+    ],
+    "target_readable": "\"But me wait!\""
+  },
+  "images": {
+    "start": "images/interaction/int_ca48725e_start.png",
+    "action": "images/interaction/int_ca48725e_action.png",
+    "end": "images/interaction/int_ca48725e_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:36:54.594647",
+  "injection_verified": false
+}

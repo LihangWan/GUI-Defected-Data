@@ -1,0 +1,41 @@
+{
+  "id": "int_a5198ecd",
+  "bug_category": "interaction",
+  "bug_type": "Unexpected_Task_Result",
+  "bug_class": "Explicit_Error_Feedback",
+  "description": "API call returned 500 Internal Server Error; application error handler triggered.",
+  "expected_behavior": "API call should succeed (200 OK) without server errors.",
+  "url": "http://localhost:3000/#/",
+  "element_semantic": {
+    "tag": "img",
+    "text": "Unknown Element",
+    "id": "",
+    "class": "mat-mdc-card-image mdc-card__media img-responsive img-thumbnail",
+    "aria_label": "",
+    "bbox": {
+      "x": 187.703125,
+      "y": 518.796875,
+      "width": 200.328125,
+      "height": 200.328125
+    },
+    "readable_name": "img.mat-mdc-card-image"
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      287,
+      618
+    ],
+    "target_readable": "img.mat-mdc-card-image"
+  },
+  "images": {
+    "start": "images/interaction/int_a5198ecd_start.png",
+    "action": "images/interaction/int_a5198ecd_action.png",
+    "end": "images/interaction/int_a5198ecd_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:52:00.319355",
+  "injection_verified": true,
+  "has_network_logs": false
+}

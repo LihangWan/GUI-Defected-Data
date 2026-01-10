@@ -1,0 +1,40 @@
+{
+  "id": "int_bcc7d700",
+  "bug_category": "interaction",
+  "bug_type": "Operation_No_Response",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Click initiated request but network was intercepted; no response received.",
+  "expected_behavior": "Click should complete and receive server response within reasonable time.",
+  "url": "http://localhost:3000/#/",
+  "element_semantic": {
+    "tag": "button",
+    "text": "menu",
+    "id": "",
+    "class": "mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-mdc-tooltip-trigger mat-unthemed",
+    "aria_label": "Open Sidenav",
+    "bbox": {
+      "x": 16,
+      "y": 12,
+      "width": 48,
+      "height": 48
+    },
+    "readable_name": "\"menu\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      40,
+      36
+    ],
+    "target_readable": "\"menu\""
+  },
+  "images": {
+    "start": "images/interaction/int_bcc7d700_start.png",
+    "action": "images/interaction/int_bcc7d700_action.png",
+    "end": "images/interaction/int_bcc7d700_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:42:05.991140",
+  "injection_verified": false
+}

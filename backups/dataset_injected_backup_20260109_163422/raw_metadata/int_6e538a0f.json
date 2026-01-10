@@ -1,0 +1,41 @@
+{
+  "id": "int_6e538a0f",
+  "bug_category": "interaction",
+  "bug_type": "Silent_Failure",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Request succeeded (200 OK) but response body was empty; operation silently failed.",
+  "expected_behavior": "Successful API response should return data; empty response indicates failure.",
+  "url": "http://localhost:3000/#/",
+  "element_semantic": {
+    "tag": "img",
+    "text": "Unknown Element",
+    "id": "",
+    "class": "mat-mdc-card-image mdc-card__media img-responsive img-thumbnail",
+    "aria_label": "",
+    "bbox": {
+      "x": 572.59375,
+      "y": 353.890625,
+      "width": 200.328125,
+      "height": 222.375
+    },
+    "readable_name": "img.mat-mdc-card-image"
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      672,
+      465
+    ],
+    "target_readable": "img.mat-mdc-card-image"
+  },
+  "images": {
+    "start": "images/interaction/int_6e538a0f_start.png",
+    "action": "images/interaction/int_6e538a0f_action.png",
+    "end": "images/interaction/int_6e538a0f_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:52:10.311798",
+  "injection_verified": true,
+  "has_network_logs": false
+}

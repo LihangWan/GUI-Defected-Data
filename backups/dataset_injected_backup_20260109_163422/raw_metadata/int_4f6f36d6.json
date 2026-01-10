@@ -1,0 +1,41 @@
+{
+  "id": "int_4f6f36d6",
+  "bug_category": "interaction",
+  "bug_type": "Validation_Error",
+  "bug_class": "Explicit_Error_Feedback",
+  "description": "Injected invalid data into input field; application validation triggered.",
+  "expected_behavior": "Input should accept valid values and only show errors for invalid data.",
+  "url": "http://localhost:3000/#/",
+  "element_semantic": {
+    "tag": "button",
+    "text": "school\nHelp getting started",
+    "id": "",
+    "class": "mdc-button mat-mdc-button-base mat-mdc-tooltip-trigger mdc-button--raised mat-mdc-raised-button mat-warn ng-star-inserte",
+    "aria_label": "",
+    "bbox": {
+      "x": 642.15625,
+      "y": 322,
+      "width": 186.453125,
+      "height": 36
+    },
+    "readable_name": "\"school\nHelp getting started\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      735,
+      340
+    ],
+    "target_readable": "\"school\nHelp getting started\""
+  },
+  "images": {
+    "start": "images/interaction/int_4f6f36d6_start.png",
+    "action": "images/interaction/int_4f6f36d6_action.png",
+    "end": "images/interaction/int_4f6f36d6_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 15:09:57.836888",
+  "injection_verified": true,
+  "has_network_logs": false
+}

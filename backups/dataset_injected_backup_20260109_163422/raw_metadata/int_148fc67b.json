@@ -1,0 +1,41 @@
+{
+  "id": "int_148fc67b",
+  "bug_category": "interaction",
+  "bug_type": "Navigation_Error",
+  "bug_class": "Navigation_Failure",
+  "description": "Navigation hijacked; application loaded 404 or error page.",
+  "expected_behavior": "Click should navigate to the correct destination without error.",
+  "url": "http://localhost:3000/nonexistent-page-1rehqaa2a",
+  "element_semantic": {
+    "tag": "button",
+    "text": "OWASP Juice Shop",
+    "id": "",
+    "class": "mdc-button mat-mdc-button-base buttons mat-mdc-button mat-unthemed",
+    "aria_label": "Back to homepage",
+    "bbox": {
+      "x": 64,
+      "y": 6,
+      "width": 272.703125,
+      "height": 60
+    },
+    "readable_name": "\"OWASP Juice Shop\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      200,
+      36
+    ],
+    "target_readable": "\"OWASP Juice Shop\""
+  },
+  "images": {
+    "start": "images/interaction/int_148fc67b_start.png",
+    "action": "images/interaction/int_148fc67b_action.png",
+    "end": "images/interaction/int_148fc67b_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 15:10:45.377281",
+  "injection_verified": true,
+  "has_network_logs": false
+}

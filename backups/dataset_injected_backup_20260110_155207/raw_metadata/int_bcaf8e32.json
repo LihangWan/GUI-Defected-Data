@@ -1,0 +1,59 @@
+{
+  "id": "int_bcaf8e32",
+  "bug_category": "interaction",
+  "bug_type": "Silent_Failure",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Request succeeded (200 OK) but response body was empty; operation silently failed.",
+  "expected_behavior": "Successful API response should return data; empty response indicates failure.",
+  "url": "http://localhost:3000/#/login",
+  "element_semantic": {
+    "tag": "button",
+    "text": "exit_to_app\nLog in",
+    "id": "loginButton",
+    "class": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-primary",
+    "aria_label": "Login",
+    "bbox": {
+      "x": 818.546875,
+      "y": 404,
+      "width": 264.890625,
+      "height": 36
+    },
+    "readable_name": "\"exit_to_app\nLog in\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      950,
+      422
+    ],
+    "target_readable": "\"exit_to_app\nLog in\""
+  },
+  "images": {
+    "start": "images/interaction/int_bcaf8e32_start.png",
+    "action": "images/interaction/int_bcaf8e32_action.png",
+    "end": "images/interaction/int_bcaf8e32_end.png"
+  },
+  "console_logs": [
+    {
+      "level": "SEVERE",
+      "message": "http://localhost:3000/vendor.js 0:463012 \"ERROR\" TypeError: Cannot read properties of undefined (reading 'status')\n    at Object.error (http://localhost:3000/main.js:1:171617)\n    at R.error (http://localhost:3000/vendor.js:1:1386609)\n    at W._error (http://localhost:3000/vendor.js:1:1386241)\n    at W.error (http://localhost:3000/vendor.js:1:1385998)\n    at o._error (http://localhost:3000/vendor.js:1:910058)\n    at o.error (http://localhost:3000/vendor.js:1:1385998)\n    at o._error (http://localhost:3000/vendor.js:1:1386241)\n    at o.error (http://localhost:3000/vendor.js:1:1385998)\n    at o._error (http://localhost:3000/vendor.js:1:1386241)\n    at o.error (http://localhost:3000/vendor.js:1:1385998)",
+      "source": "console-api",
+      "timestamp": 1768031370888
+    }
+  ],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-10 15:49:31.583657",
+  "injection_verified": false,
+  "visual_verified": false,
+  "visual_signals": {
+    "similarity": 0.8974,
+    "has_spinner": false,
+    "has_error_ele": false,
+    "has_validation_ele": false,
+    "invalid_input_count": 0,
+    "has_network_logs": false,
+    "new_console_errors": 1,
+    "has_injection_related_error": true
+  },
+  "has_network_logs": false
+}

@@ -1,0 +1,55 @@
+{
+  "id": "int_5f77939e",
+  "bug_category": "interaction",
+  "bug_type": "Operation_No_Response",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Click initiated request but network was intercepted; no response received.",
+  "expected_behavior": "Click should complete and receive server response within reasonable time.",
+  "url": "http://localhost:3000/#/",
+  "element_semantic": {
+    "tag": "button",
+    "text": "school\nHelp getting started",
+    "id": "",
+    "class": "mdc-button mat-mdc-button-base mat-mdc-tooltip-trigger mdc-button--raised mat-mdc-raised-button mat-warn ng-star-inserte",
+    "aria_label": "",
+    "bbox": {
+      "x": 642.15625,
+      "y": 322,
+      "width": 186.453125,
+      "height": 36
+    },
+    "readable_name": "\"school\nHelp getting started\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      735,
+      340
+    ],
+    "target_readable": "\"school\nHelp getting started\""
+  },
+  "images": {
+    "start": "images/interaction/int_5f77939e_start.png",
+    "action": "images/interaction/int_5f77939e_action.png",
+    "end": "images/interaction/int_5f77939e_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [
+    {
+      "type": "timeout",
+      "url": "/rest/admin/application-configuration"
+    }
+  ],
+  "timestamp": "2026-01-10 14:36:17.578389",
+  "injection_verified": true,
+  "visual_verified": false,
+  "visual_signals": {
+    "similarity": 0.6104,
+    "has_spinner": false,
+    "has_error_ele": false,
+    "has_validation_ele": false,
+    "invalid_input_count": 0,
+    "has_network_logs": true
+  },
+  "has_network_logs": true
+}

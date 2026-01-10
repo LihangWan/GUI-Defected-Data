@@ -1,0 +1,50 @@
+{
+  "id": "int_1e2c6807",
+  "bug_category": "interaction",
+  "bug_type": "Navigation_Error",
+  "bug_class": "Navigation_Failure",
+  "description": "Navigation hijacked; application loaded 404 or error page.",
+  "expected_behavior": "Click should navigate to the correct destination without error.",
+  "url": "http://localhost:3000/#/contact",
+  "element_semantic": {
+    "tag": "button",
+    "text": "send\nSubmit",
+    "id": "submitButton",
+    "class": "mdc-button mat-mdc-button-base mdc-button--raised mat-mdc-raised-button mat-primary mat-mdc-button-disabled",
+    "aria_label": "Button to send the review",
+    "bbox": {
+      "x": 790.015625,
+      "y": 570,
+      "width": 321.953125,
+      "height": 36
+    },
+    "readable_name": "\"send\nSubmit\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      950,
+      588
+    ],
+    "target_readable": "\"send\nSubmit\""
+  },
+  "images": {
+    "start": "images/interaction/int_1e2c6807_start.png",
+    "action": "images/interaction/int_1e2c6807_action.png",
+    "end": "images/interaction/int_1e2c6807_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-10 15:23:41.205449",
+  "injection_verified": false,
+  "visual_verified": false,
+  "visual_signals": {
+    "similarity": 0.8856,
+    "has_spinner": false,
+    "has_error_ele": false,
+    "has_validation_ele": false,
+    "invalid_input_count": 0,
+    "has_network_logs": false
+  },
+  "has_network_logs": false
+}

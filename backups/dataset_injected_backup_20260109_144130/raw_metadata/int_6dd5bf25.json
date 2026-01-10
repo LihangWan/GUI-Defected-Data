@@ -1,0 +1,40 @@
+{
+  "id": "int_6dd5bf25",
+  "bug_category": "interaction",
+  "bug_type": "Navigation_Error",
+  "bug_class": "Navigation_Failure",
+  "description": "Navigation hijacked; application loaded 404 or error page.",
+  "expected_behavior": "Click should navigate to the correct destination without error.",
+  "url": "http://localhost:3000/#/",
+  "element_semantic": {
+    "tag": "img",
+    "text": "Unknown Element",
+    "id": "",
+    "class": "mat-mdc-card-image mdc-card__media img-responsive img-thumbnail",
+    "aria_label": "",
+    "bbox": {
+      "x": 572.59375,
+      "y": 518.796875,
+      "width": 200.328125,
+      "height": 222.375
+    },
+    "readable_name": "img.mat-mdc-card-image"
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      672,
+      629
+    ],
+    "target_readable": "img.mat-mdc-card-image"
+  },
+  "images": {
+    "start": "images/interaction/int_6dd5bf25_start.png",
+    "action": "images/interaction/int_6dd5bf25_action.png",
+    "end": "images/interaction/int_6dd5bf25_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:36:32.403967",
+  "injection_verified": true
+}

@@ -1,0 +1,41 @@
+{
+  "id": "int_4caf59bf",
+  "bug_category": "interaction",
+  "bug_type": "Timeout_Hang",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Network latency simulated (15s); application shows loading spinner.",
+  "expected_behavior": "Request should complete within 5-10 seconds, not hang indefinitely.",
+  "url": "http://localhost:3000/#/search",
+  "element_semantic": {
+    "tag": "button",
+    "text": "OWASP Juice Shop",
+    "id": "",
+    "class": "mdc-button mat-mdc-button-base buttons mat-mdc-button mat-unthemed",
+    "aria_label": "Back to homepage",
+    "bbox": {
+      "x": 64,
+      "y": 6,
+      "width": 272.703125,
+      "height": 60
+    },
+    "readable_name": "\"OWASP Juice Shop\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      200,
+      36
+    ],
+    "target_readable": "\"OWASP Juice Shop\""
+  },
+  "images": {
+    "start": "images/interaction/int_4caf59bf_start.png",
+    "action": "images/interaction/int_4caf59bf_action.png",
+    "end": "images/interaction/int_4caf59bf_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 15:11:54.316624",
+  "injection_verified": false,
+  "has_network_logs": false
+}

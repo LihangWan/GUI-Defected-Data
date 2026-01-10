@@ -1,0 +1,41 @@
+{
+  "id": "int_bb3dac92",
+  "bug_category": "interaction",
+  "bug_type": "Navigation_Error",
+  "bug_class": "Navigation_Failure",
+  "description": "Navigation hijacked; application loaded 404 or error page.",
+  "expected_behavior": "Click should navigate to the correct destination without error.",
+  "url": "http://localhost:3000/#/login",
+  "element_semantic": {
+    "tag": "button",
+    "text": "exit_to_app\nLogin",
+    "id": "navbarLoginButton",
+    "class": "mat-mdc-menu-item mat-focus-indicator ng-star-inserted cdk-focused cdk-program-focused",
+    "aria_label": "Go to login page",
+    "bbox": {
+      "x": 1719.390625,
+      "y": 68,
+      "width": 112,
+      "height": 48
+    },
+    "readable_name": "\"exit_to_app\nLogin\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1775,
+      92
+    ],
+    "target_readable": "\"exit_to_app\nLogin\""
+  },
+  "images": {
+    "start": "images/interaction/int_bb3dac92_start.png",
+    "action": "images/interaction/int_bb3dac92_action.png",
+    "end": "images/interaction/int_bb3dac92_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:52:31.831622",
+  "injection_verified": true,
+  "has_network_logs": false
+}

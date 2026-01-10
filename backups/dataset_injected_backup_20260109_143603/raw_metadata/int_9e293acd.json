@@ -1,0 +1,40 @@
+{
+  "id": "int_9e293acd",
+  "bug_category": "interaction",
+  "bug_type": "Navigation_Error",
+  "bug_class": "Navigation_Failure",
+  "description": "Navigation hijacked; application loaded 404 or error page.",
+  "expected_behavior": "Click should navigate to the correct destination without error.",
+  "url": "http://localhost:3000/#/register",
+  "element_semantic": {
+    "tag": "button",
+    "text": "menu",
+    "id": "",
+    "class": "mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-mdc-tooltip-trigger mat-unthemed",
+    "aria_label": "Open Sidenav",
+    "bbox": {
+      "x": 16,
+      "y": 12,
+      "width": 48,
+      "height": 48
+    },
+    "readable_name": "\"menu\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      40,
+      36
+    ],
+    "target_readable": "\"menu\""
+  },
+  "images": {
+    "start": "images/interaction/int_9e293acd_start.png",
+    "action": "images/interaction/int_9e293acd_action.png",
+    "end": "images/interaction/int_9e293acd_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 14:28:31.111978",
+  "injection_verified": true
+}

@@ -5,6 +5,19 @@
 
 ---
 
+## 🆕 **最新更新** (2024-01-09)
+
+**交互缺陷系统已修复和增强**:
+- ✅ **修复红标显示问题** - action图片右上角的红标现在清晰可见
+- ✅ **增加注入验证机制** - 可以确认Bug是否注入成功（`injection_verified`字段）
+- ✅ **新增自动化工具** - `quick_sample_generator.py` 和 `check_samples.py`
+- ✅ **详细日志输出** - 实时查看每个注入步骤的成功/失败状态
+
+📖 **查看详细修改**: [MODIFICATION_SUMMARY.md](MODIFICATION_SUMMARY.md)  
+🚀 **快速验证修复**: [QUICK_START.md](QUICK_START.md)
+
+---
+
 ## 📌 快速导航
 
 ### 🎯 按使用场景选择
@@ -13,7 +26,8 @@
 |------|------|------|
 | **视觉缺陷**（布局错位、颜色对比、文本溢出等） | [VISUAL_INJECTION_GUIDE.md](VISUAL_INJECTION_GUIDE.md) | 9 种视觉缺陷类型完整指南 |
 | **交互缺陷**（表单验证、网络超时、无响应等） | [INTERACTION_INJECTION_GUIDE.md](INTERACTION_INJECTION_GUIDE.md) | 5 种交互缺陷 + WebArena 方案 |
-| **快速尝试** | [快速开始](#快速开始) | 本文档下方 |
+| **交互系统快速测试** | [QUICK_START.md](QUICK_START.md) | **新增** 快速生成和验证样本 |
+| **详细修改说明** | [MODIFICATION_SUMMARY.md](MODIFICATION_SUMMARY.md) | **新增** 修复详情和技术细节 |
 
 ---
 

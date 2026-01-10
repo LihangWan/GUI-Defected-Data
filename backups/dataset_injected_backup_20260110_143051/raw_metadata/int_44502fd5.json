@@ -1,0 +1,50 @@
+{
+  "id": "int_44502fd5",
+  "bug_category": "interaction",
+  "bug_type": "Timeout_Hang",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Network latency simulated (15s); application shows loading spinner.",
+  "expected_behavior": "Request should complete within 5-10 seconds, not hang indefinitely.",
+  "url": "http://localhost:3000/#/register",
+  "element_semantic": {
+    "tag": "a",
+    "text": "But me wait!",
+    "id": "",
+    "class": "cc-link",
+    "aria_label": "learn more about cookies",
+    "bbox": {
+      "x": 1521.1875,
+      "y": 810.9375,
+      "width": 97.40625,
+      "height": 30.375
+    },
+    "readable_name": "\"But me wait!\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1569,
+      826
+    ],
+    "target_readable": "\"But me wait!\""
+  },
+  "images": {
+    "start": "images/interaction/int_44502fd5_start.png",
+    "action": "images/interaction/int_44502fd5_action.png",
+    "end": "images/interaction/int_44502fd5_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 16:35:21.058503",
+  "injection_verified": true,
+  "visual_verified": true,
+  "visual_signals": {
+    "similarity": 0.6467,
+    "has_spinner": true,
+    "has_error_ele": true,
+    "has_validation_ele": true,
+    "invalid_input_count": 1,
+    "has_network_logs": false
+  },
+  "has_network_logs": false
+}

@@ -1,0 +1,50 @@
+{
+  "id": "int_a3a91c31",
+  "bug_category": "interaction",
+  "bug_type": "Silent_Failure",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Request succeeded (200 OK) but response body was empty; operation silently failed.",
+  "expected_behavior": "Successful API response should return data; empty response indicates failure.",
+  "url": "http://localhost:3000/#/basket",
+  "element_semantic": {
+    "tag": "button",
+    "text": "account_circle\nAccount",
+    "id": "navbarAccount",
+    "class": "mdc-button mat-mdc-button-base mat-mdc-menu-trigger buttons hide-lt-md mat-mdc-button mat-unthemed",
+    "aria_label": "Show/hide account menu",
+    "bbox": {
+      "x": 1719.390625,
+      "y": 12,
+      "width": 102.609375,
+      "height": 48
+    },
+    "readable_name": "\"account_circle\nAccount\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1770,
+      36
+    ],
+    "target_readable": "\"account_circle\nAccount\""
+  },
+  "images": {
+    "start": "images/interaction/int_a3a91c31_start.png",
+    "action": "images/interaction/int_a3a91c31_action.png",
+    "end": "images/interaction/int_a3a91c31_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-10 14:58:16.564450",
+  "injection_verified": false,
+  "visual_verified": false,
+  "visual_signals": {
+    "similarity": 0.8665,
+    "has_spinner": false,
+    "has_error_ele": false,
+    "has_validation_ele": false,
+    "invalid_input_count": 0,
+    "has_network_logs": false
+  },
+  "has_network_logs": false
+}

@@ -1,0 +1,41 @@
+{
+  "id": "int_842a6602",
+  "bug_category": "interaction",
+  "bug_type": "Timeout_Hang",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Network latency simulated (15s); application shows loading spinner.",
+  "expected_behavior": "Request should complete within 5-10 seconds, not hang indefinitely.",
+  "url": "http://localhost:8080/wp-admin/install.php?step=1",
+  "element_semantic": {
+    "tag": "input",
+    "text": "Continue",
+    "id": "language-continue",
+    "class": "button button-primary button-large",
+    "aria_label": "",
+    "bbox": {
+      "x": 1018.890625,
+      "y": 637,
+      "width": 82.109375,
+      "height": 34.296875
+    },
+    "readable_name": "\"Continue\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1059,
+      654
+    ],
+    "target_readable": "\"Continue\""
+  },
+  "images": {
+    "start": "images/interaction/int_842a6602_start.png",
+    "action": "images/interaction/int_842a6602_action.png",
+    "end": "images/interaction/int_842a6602_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-09 15:17:35.979254",
+  "injection_verified": false,
+  "has_network_logs": false
+}

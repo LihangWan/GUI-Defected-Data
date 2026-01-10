@@ -1,0 +1,50 @@
+{
+  "id": "int_8fcc72f1",
+  "bug_category": "interaction",
+  "bug_type": "Timeout_Hang",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Network latency simulated (15s); application shows loading spinner.",
+  "expected_behavior": "Request should complete within 5-10 seconds, not hang indefinitely.",
+  "url": "http://localhost:3000/#/forgot-password",
+  "element_semantic": {
+    "tag": "button",
+    "text": "account_circle\nAccount",
+    "id": "navbarAccount",
+    "class": "mdc-button mat-mdc-button-base mat-mdc-menu-trigger buttons hide-lt-md mat-mdc-button mat-unthemed",
+    "aria_label": "Show/hide account menu",
+    "bbox": {
+      "x": 1719.390625,
+      "y": 12,
+      "width": 102.609375,
+      "height": 48
+    },
+    "readable_name": "\"account_circle\nAccount\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      1770,
+      36
+    ],
+    "target_readable": "\"account_circle\nAccount\""
+  },
+  "images": {
+    "start": "images/interaction/int_8fcc72f1_start.png",
+    "action": "images/interaction/int_8fcc72f1_action.png",
+    "end": "images/interaction/int_8fcc72f1_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-10 14:57:54.131850",
+  "injection_verified": true,
+  "visual_verified": true,
+  "visual_signals": {
+    "similarity": 0.843,
+    "has_spinner": true,
+    "has_error_ele": true,
+    "has_validation_ele": true,
+    "invalid_input_count": 0,
+    "has_network_logs": false
+  },
+  "has_network_logs": false
+}

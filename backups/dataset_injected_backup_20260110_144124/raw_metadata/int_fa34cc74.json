@@ -1,0 +1,50 @@
+{
+  "id": "int_fa34cc74",
+  "bug_category": "interaction",
+  "bug_type": "Silent_Failure",
+  "bug_class": "Frozen_Unresponsive",
+  "description": "Request succeeded (200 OK) but response body was empty; operation silently failed.",
+  "expected_behavior": "Successful API response should return data; empty response indicates failure.",
+  "url": "https://accounts.google.com/v3/signin/identifier?opparams=%253F&dsh=S-1190793134%3A1768027213518785&client_id=1005568560502-6hm16lef8oh46hr2d98vf2ohlnj4nfhq.apps.googleusercontent.com&o2v=2&redirect_uri=https%3A%2F%2Flocal3000.owasp-juice.shop&response_type=token&scope=email&service=lso&flowName=GeneralOAuthLite&continue=https%3A%2F%2Faccounts.google.com%2Fsignin%2Foauth%2Flegacy%2Fconsent%3Fauthuser%3Dunknown%26part%3DAJi8hAOdKlNnSVGiBtqPicYSzyDveK9HmPm6i4m_V-k1q3TnCTXPZVZIBzNxH2JAZY89eObcaiThYQ9-N31nQgh1tDvqTUQKpQfF8qfGAU3kJEWzU5n_rAlbXz2l-IxlPkxqKy0xVIYq_kY9lLiTYAb7CMAaINj08XH6iHzdly4EUpElXg5PViI4B3h4-123p8oGCU7j0eV2L6QDTCCGzBPJUvuhe2NP-5J5AHMYwLeIoNYmgRlCoIhlo7o3zNhMy5q5JeAHCkH_XAccj7ZdZAEknq9rQ6MtYbN-63qiGZ6t_CyaxoIZPseWYi1zPfW4jcsgmGmL4JhLMrZJKGNtjOplf-FLnWRHHubpmTMNolpve-NuvFg6gH3LgKV9I5GWWh_5PqXDZQ7iDr9FN0dlMu7jADeA_fzrmp1YaOrOdWuSPUkNiM-KmcHeXaK2mgjRV9jrqDX0ySum8owoMwVVQsdb9Lf1kW1HEf9Nzpl6oNlcdXBtzxQcwF3demQLeQNMZQp8UIXVBWB-e2GkirjveFtrTcXBOjFttx41EkV72qDT34mCLyZBcsEsj53TLJFqrwJQOUnc3qxCjikqek45TQSiq0DdVX80NmdYO97ghZZrwC6fl9lGPoq9tEBPBFFSsBSnBk3GJoJdGD_7kC-vA0ecTVHMwaYOpA%26flowName%3DGeneralOAuthFlow%26as%3DS-1190793134%253A1768027213518785%26client_id%3D1005568560502-6hm16lef8oh46hr2d98vf2ohlnj4nfhq.apps.googleusercontent.com%23&app_domain=https%3A%2F%2Flocal3000.owasp-juice.shop&rart=ANgoxcc9wqKLkWG9v-jVy2UFWGSv1JnRUoOeDlsg17DPQ3VsHGUawWsOZDLMgboeTv32f8gY-hoTCDyACs3hSEaDLS2Qtn860u-6Ogce19PchVtKCQhhVmU",
+  "element_semantic": {
+    "tag": "button",
+    "text": "Log in with Google",
+    "id": "loginButtonGoogle",
+    "class": "mdc-button mat-mdc-button-base google-button mdc-button--raised mat-mdc-raised-button mat-accent ng-star-inserted",
+    "aria_label": "Login with Google",
+    "bbox": {
+      "x": 818.546875,
+      "y": 555,
+      "width": 264.890625,
+      "height": 36
+    },
+    "readable_name": "\"Log in with Google\""
+  },
+  "action_trace": {
+    "action": "click",
+    "coordinates": [
+      950,
+      573
+    ],
+    "target_readable": "\"Log in with Google\""
+  },
+  "images": {
+    "start": "images/interaction/int_fa34cc74_start.png",
+    "action": "images/interaction/int_fa34cc74_action.png",
+    "end": "images/interaction/int_fa34cc74_end.png"
+  },
+  "console_logs": [],
+  "interceptor_logs": [],
+  "timestamp": "2026-01-10 14:40:13.958383",
+  "injection_verified": false,
+  "visual_verified": false,
+  "visual_signals": {
+    "similarity": 0.0149,
+    "has_spinner": false,
+    "has_error_ele": false,
+    "has_validation_ele": false,
+    "invalid_input_count": 0,
+    "has_network_logs": false
+  },
+  "has_network_logs": false
+}
