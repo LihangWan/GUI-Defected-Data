@@ -5,16 +5,10 @@
 
 ---
 
-## 🆕 **最新更新** (2024-01-09)
+## 🆕 **最新更新** (2026-01)
 
-**交互缺陷系统已修复和增强**:
-- ✅ **修复红标显示问题** - action图片右上角的红标现在清晰可见
-- ✅ **增加注入验证机制** - 可以确认Bug是否注入成功（`injection_verified`字段）
-- ✅ **新增自动化工具** - `quick_sample_generator.py` 和 `check_samples.py`
-- ✅ **详细日志输出** - 实时查看每个注入步骤的成功/失败状态
-
-📖 **查看详细修改**: [MODIFICATION_SUMMARY.md](MODIFICATION_SUMMARY.md)  
-🚀 **快速验证修复**: [QUICK_START.md](QUICK_START.md)
+- 交互类缺陷注入切换到 `interaction_engine/`（入口 `main_interaction.py`），新增原生优先策略与多样化兜底样式。
+- 新增交互数据指南：[INTERACTION_BUG_DATA_GUIDE.md](INTERACTION_BUG_DATA_GUIDE.md)
 
 ---
 
@@ -24,10 +18,9 @@
 
 | 场景 | 文档 | 说明 |
 |------|------|------|
-| **视觉缺陷**（布局错位、颜色对比、文本溢出等） | [VISUAL_INJECTION_GUIDE.md](VISUAL_INJECTION_GUIDE.md) | 9 种视觉缺陷类型完整指南 |
-| **交互缺陷**（表单验证、网络超时、无响应等） | [INTERACTION_INJECTION_GUIDE.md](INTERACTION_INJECTION_GUIDE.md) | 5 种交互缺陷 + WebArena 方案 |
-| **交互系统快速测试** | [QUICK_START.md](QUICK_START.md) | **新增** 快速生成和验证样本 |
-| **详细修改说明** | [MODIFICATION_SUMMARY.md](MODIFICATION_SUMMARY.md) | **新增** 修复详情和技术细节 |
+| **视觉缺陷**（布局错位、颜色对比、文本溢出等） | [auto_injector.py](auto_injector.py) | 视觉缺陷采集脚本（脚本内含说明） |
+| **交互缺陷**（Big Three：404/无响应/错误结果） | [INTERACTION_BUG_DATA_GUIDE.md](INTERACTION_BUG_DATA_GUIDE.md) | 交互数据类型、生成流程与质量策略 |
+| **交互系统快速验证** | [verify_bugs.py](verify_bugs.py) | 交互注入回归验证脚本 |
 
 ---
 
@@ -51,26 +44,24 @@ python auto_injector.py
 - DEBUG 模式下红框标记缺陷位置
 - 生产模式自动过滤低质量样本
 
-### 交互缺陷注入（interaction_injector.py）
+### 交互缺陷注入（main_interaction.py）
 
-采集**交互异常**（表单验证错误、网络超时等），用于训练交互错误检测。
+采集**交互异常**（Navigation_Error、Operation_No_Response、Unexpected_Task_Result），用于训练交互错误检测。
 
 ```bash
-python interaction_injector.py
+python main_interaction.py
 ```
 
-**支持 5 种缺陷类型**：
-1. **Validation_Error** - 表单提交验证失败
-2. **Network_Timeout** - 网络请求超时（30s+）
-3. **Unexpected_Feedback** - 请求返回异常数据
-4. **Timeout_Hang** - 请求长时间延迟（5s+）
-5. **Silent_Failure** - 请求失败但无错误反馈
+**支持 3 类核心缺陷（Big Three）**：
+1. **Navigation_Error** - 错误路由/404/跳转异常
+2. **Operation_No_Response** - 点击无响应/长时间卡顿
+3. **Unexpected_Task_Result** - 错误提示或结果异常（toast/snackbar）
 
 **技术亮点**：
-- ✅ **WebArena 启发**：本地部署应用替代静态网站
-- ✅ **智能拦截**：JavaScript 应用层拦截（无浏览器崩溃）
-- ✅ **特征检测**：自动扫描页面，推荐合适缺陷
-- ✅ **加权采样**：根据页面特征动态调整权重
+- ✅ 原生优先：优先使用站点原生 404/loading/toast 组件，避免模板过拟合
+- ✅ 多样化兜底：`interaction_engine/visual_styles.py` 提供 5 组多样化样式
+- ✅ 质量验证：注入后进行可见性/可交互性/视觉变化验证
+- ✅ 可扩展：站点列表与采样参数在 `interaction_engine/config.py` 配置
 
 ---
 
@@ -125,7 +116,7 @@ curl http://localhost:8080      # WordPress
 #### 步骤 B：运行采集器
 
 ```bash
-python interaction_injector.py
+python main_interaction.py
 ```
 
 输出：`dataset_injected/images/interaction/` + `raw_metadata/int_*.json`
@@ -225,11 +216,10 @@ use_js_interceptor = True  # ✅ 推荐
 ```
 .
 ├── README.md                        # 项目总览（本文件）
-├── VISUAL_INJECTION_GUIDE.md        # 视觉缺陷完整指南
-├── INTERACTION_INJECTION_GUIDE.md   # 交互缺陷完整指南
+├── INTERACTION_BUG_DATA_GUIDE.md    # 交互缺陷数据指南
 │
 ├── auto_injector.py                 # 视觉缺陷采集脚本
-├── interaction_injector.py          # 交互缺陷采集脚本
+├── main_interaction.py              # 交互缺陷采集入口
 ├── templates.py                     # 自然语言报告生成
 │
 ├── docker-compose.yml               # 本地应用部署
@@ -285,7 +275,7 @@ ls dataset_injected/images/visual/
 ```bash
 python auto_injector.py
 docker-compose up -d
-python interaction_injector.py
+python main_interaction.py
 python templates.py generate
 ```
 
