@@ -132,6 +132,10 @@ python interaction_injector.py
 
 ---
 
+## 📊 数据生成
+
+- 交互类数据生成与质量策略详见 [INTERACTION_BUG_DATA_GUIDE.md](INTERACTION_BUG_DATA_GUIDE.md)
+
 ## 📊 数据输出格式
 
 ### 视觉缺陷输出

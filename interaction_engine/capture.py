@@ -63,11 +63,15 @@ def ensure_dirs() -> None:
 
 
 def bug_class(bug_type: str) -> str:
-    frozen = {"Operation_No_Response", "Timeout_Hang", "Silent_Failure"}
-    explicit = {"Unexpected_Task_Result", "Validation_Error"}
-    if bug_type in frozen:
+    """Classify bug type into categories (Big Three Taxonomy).
+    
+    - Frozen_Unresponsive: Operation_No_Response (dead click / timeout hang)
+    - Explicit_Error_Feedback: Unexpected_Task_Result (500 error toast)
+    - Navigation_Failure: Navigation_Error (404 / wrong route)
+    """
+    if bug_type == "Operation_No_Response":
         return "Frozen_Unresponsive"
-    if bug_type in explicit:
+    if bug_type == "Unexpected_Task_Result":
         return "Explicit_Error_Feedback"
     if bug_type == "Navigation_Error":
         return "Navigation_Failure"
@@ -75,13 +79,11 @@ def bug_class(bug_type: str) -> str:
 
 
 def expected_behavior(bug_type: str) -> str:
+    """Get expected behavior description for Big Three bug types."""
     mapping = {
         "Operation_No_Response": "Click should complete and receive server response within reasonable time.",
         "Navigation_Error": "Click should navigate to the correct destination without error.",
         "Unexpected_Task_Result": "API call should succeed (200 OK) without server errors.",
-        "Timeout_Hang": "Request should complete within 5-10 seconds, not hang indefinitely.",
-        "Silent_Failure": "Successful API response should return data; empty response indicates failure.",
-        "Validation_Error": "Input should accept valid values and only show errors for invalid data.",
         "Unknown": "Action should complete successfully without errors.",
     }
     return mapping.get(bug_type, "Action should complete successfully.")

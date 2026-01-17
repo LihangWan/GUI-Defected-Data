@@ -1,10 +1,32 @@
 import os
+import sys
 import time
 import uuid
 import random
 import json
+import numpy as np
 from typing import List, Dict, Any
 from datetime import datetime
+
+# Fix Windows console encoding for Unicode characters
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except AttributeError:
+        pass  # Python < 3.7
+
+try:
+    import cv2
+    from skimage.metrics import structural_similarity as ssim
+    HAS_CV2 = True
+except ImportError:
+    HAS_CV2 = False
+try:
+    from PIL import Image, ImageChops
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -30,6 +52,14 @@ from .capture import (
     three_frame_paths,
 )
 from .selector import get_candidates, get_network_triggering_candidates, discover_internal_links
+from .visual_styles import (
+    generate_404_page_js,
+    generate_loading_overlay_js,
+    generate_error_toast_js,
+    get_random_404_style,
+    get_random_loading_style,
+    get_random_error_toast_style,
+)
 
 
 class PageFeatureDetector:
@@ -94,40 +124,44 @@ class PageFeatureDetector:
         return False
 
     def get_allowed_bugs(self) -> List[str]:
+        """Return allowed bug types based on Big Three taxonomy.
+        
+        Bug Types (ICE-Web Big Three):
+        - Navigation_Error: User clicks but redirected to 404/wrong route
+        - Operation_No_Response: Click fails to produce expected outcome (dead click/timeout)
+        - Unexpected_Task_Result: System returns visible error (500 response)
+        """
         allowed = ["Navigation_Error"]
         page_type = self.features.get("page_type", "static")
         has_inputs = self.features.get("has_inputs", False)
         has_forms = self.features.get("has_forms", False)
         if page_type != "static":
-            allowed += ["Timeout_Hang", "Operation_No_Response"]
+            allowed += ["Operation_No_Response"]
         if has_forms or has_inputs:
-            allowed += ["Validation_Error", "Unexpected_Task_Result", "Silent_Failure"]
+            allowed += ["Unexpected_Task_Result"]
         return allowed
 
     def get_bug_priority(self) -> Dict[str, float]:
+        """Get bug type weights based on page characteristics.
+        
+        Big Three Bug Types only:
+        - Navigation_Error: Always available
+        - Operation_No_Response: For dynamic/interactive pages
+        - Unexpected_Task_Result: For pages with forms/API interactions
+        """
         page_type = self.features.get("page_type", "static")
-        input_count = self.features.get("input_count", 0)
         weights = {
             "Navigation_Error": 1.0,
-            "Timeout_Hang": 1.0,
-            "Validation_Error": 1.0,
             "Unexpected_Task_Result": 1.0,
-            "Operation_No_Response": 1.0,
-            "Silent_Failure": 1.0,
+            "Operation_No_Response": 1.2,
         }
         if page_type == "form_heavy":
-            weights["Validation_Error"] = 3.0
-            weights["Unexpected_Task_Result"] = 2.0
-            weights["Silent_Failure"] = 1.5
+            weights["Unexpected_Task_Result"] = 2.5
         elif page_type == "ecommerce":
-            weights["Validation_Error"] = 2.5
             weights["Unexpected_Task_Result"] = 2.5
             weights["Operation_No_Response"] = 1.5
         elif page_type == "interactive":
             weights["Operation_No_Response"] = 1.5
-            weights["Timeout_Hang"] = 1.5
-        if input_count > 5:
-            weights["Validation_Error"] *= 1.5
         return weights
 
     def print_summary(self) -> None:
@@ -142,6 +176,420 @@ class PageFeatureDetector:
         print(f"[W] Bug Weights: {self.get_bug_priority()}")
         print(f"{'='*60}\n")
 
+
+class NativeErrorPageDetector:
+    """检测网站是否有原生错误页面、加载动画和错误提示
+    
+    优先使用网站原生的错误页面，这样可以：
+    1. 提高多样性，避免模型过拟合
+    2. 更真实地模拟实际 bug 场景
+    3. 每个网站的 404/500 页面都不同
+    """
+    
+    # 常见的 404 路径模式
+    COMMON_404_PATHS = [
+        '/404',
+        '/error/404', 
+        '/not-found',
+        '/page-not-found',
+        '/nonexistent-test-page-xyz123',
+    ]
+    
+    # 404 页面内容特征
+    ERROR_404_KEYWORDS = [
+        '404', 'not found', 'page not found', 'does not exist',
+        'cannot be found', 'couldn\'t find', 'no longer exists',
+        'removed', 'deleted', 'unavailable', 'missing page',
+        '找不到', '页面不存在', '页面丢失',
+    ]
+    
+    # 加载动画 CSS 选择器
+    LOADING_SELECTORS = [
+        '.spinner', '.loading', '.loader', '.progress',
+        '.mat-progress-spinner', '.mat-mdc-progress-spinner',
+        '.mat-progress-bar', '.mdc-linear-progress',
+        '.ngx-spinner', '.v-progress-circular', '.el-loading',
+        '[class*="spinner"]', '[class*="loading"]', '[class*="loader"]',
+        '.sk-circle', '.lds-ring', '.lds-dual-ring',
+    ]
+    
+    # 错误提示 CSS 选择器
+    ERROR_TOAST_SELECTORS = [
+        '.toast', '.notification', '.alert', '.snackbar',
+        '.mat-snack-bar-container', '.mdc-snackbar',
+        '.v-toast', '.el-message', '.ant-message',
+        '[class*="toast"]', '[class*="notification"]',
+        '[class*="error"]', '[class*="alert"]',
+    ]
+    
+    def __init__(self, driver: webdriver.Chrome):
+        self.driver = driver
+        self._cache: Dict[str, Dict[str, Any]] = {}  # 按域名缓存检测结果
+    
+    def _get_domain(self, url: str) -> str:
+        """提取域名用于缓存"""
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            return f"{parsed.scheme}://{parsed.netloc}"
+        except:
+            return url.split('/')[0:3]
+    
+    def detect_native_404(self, base_url: str) -> Dict[str, Any]:
+        """检测网站是否有原生 404 页面
+        
+        Returns:
+            {
+                'has_native_404': bool,
+                'native_404_url': str or None,
+                'detection_method': str,
+                'visual_change_pct': float,
+            }
+        """
+        domain = self._get_domain(base_url)
+        cache_key = f"{domain}:404"
+        
+        # 检查缓存
+        if cache_key in self._cache:
+            print(f"  [Cache] 使用缓存的 404 检测结果: {self._cache[cache_key]['has_native_404']}")
+            return self._cache[cache_key]
+        
+        result = {
+            'has_native_404': False,
+            'native_404_url': None,
+            'detection_method': 'none',
+            'visual_change_pct': 0.0,
+        }
+        
+        try:
+            # 保存当前 URL 和页面状态
+            original_url = self.driver.current_url
+            original_title = self.driver.title
+            
+            # 获取首页截图用于对比
+            try:
+                self.driver.get(base_url)
+                time.sleep(1)
+                home_screenshot = self.driver.get_screenshot_as_png()
+            except:
+                home_screenshot = None
+            
+            # 尝试访问不存在的页面
+            for test_path in self.COMMON_404_PATHS:
+                test_url = f"{domain}{test_path}"
+                try:
+                    self.driver.get(test_url)
+                    time.sleep(1.5)
+                    
+                    # 检查页面内容
+                    page_source = self.driver.page_source.lower()
+                    body_text = ""
+                    try:
+                        body_text = self.driver.find_element(By.TAG_NAME, 'body').text.lower()
+                    except:
+                        pass
+                    
+                    # 方法1: 检查 HTTP 状态码 (通过 JavaScript)
+                    # 注意: SPA 通常不会返回真正的 404 状态码
+                    
+                    # 方法2: 检查页面内容是否包含 404 关键词
+                    has_404_keyword = any(kw.lower() in body_text or kw.lower() in page_source 
+                                          for kw in self.ERROR_404_KEYWORDS)
+                    
+                    # 方法3: 检查页面视觉是否与首页不同
+                    visual_different = False
+                    if home_screenshot and HAS_PIL:
+                        try:
+                            current_screenshot = self.driver.get_screenshot_as_png()
+                            from io import BytesIO
+                            img1 = Image.open(BytesIO(home_screenshot))
+                            img2 = Image.open(BytesIO(current_screenshot))
+                            diff = ImageChops.difference(img1, img2)
+                            diff_pixels = sum(sum(p) > 0 for p in diff.getdata())
+                            total_pixels = img1.width * img1.height
+                            change_pct = (diff_pixels / total_pixels) * 100
+                            result['visual_change_pct'] = change_pct
+                            visual_different = change_pct > 30  # 超过30%变化
+                        except:
+                            pass
+                    
+                    # 判断是否是原生 404
+                    if has_404_keyword and visual_different:
+                        result['has_native_404'] = True
+                        result['native_404_url'] = test_url
+                        result['detection_method'] = 'keyword+visual'
+                        print(f"  [Detect] 发现原生 404 页面: {test_url}")
+                        break
+                    elif has_404_keyword:
+                        result['has_native_404'] = True
+                        result['native_404_url'] = test_url
+                        result['detection_method'] = 'keyword'
+                        print(f"  [Detect] 发现原生 404 页面 (关键词匹配): {test_url}")
+                        break
+                    elif visual_different and result['visual_change_pct'] > 50:
+                        # 视觉变化很大，可能是错误页面
+                        result['has_native_404'] = True
+                        result['native_404_url'] = test_url
+                        result['detection_method'] = 'visual'
+                        print(f"  [Detect] 发现可能的 404 页面 (视觉变化 {result['visual_change_pct']:.1f}%): {test_url}")
+                        break
+                        
+                except Exception as e:
+                    # 如果访问出错 (真正的 404 HTTP 错误)，这可能是原生 404
+                    print(f"  [Detect] 访问 {test_url} 出错: {e}")
+                    continue
+            
+            # 返回原页面
+            try:
+                self.driver.get(original_url)
+                time.sleep(0.5)
+            except:
+                pass
+                
+        except Exception as e:
+            print(f"  [Detect] 404 检测失败: {e}")
+        
+        # 缓存结果
+        self._cache[cache_key] = result
+        
+        if not result['has_native_404']:
+            print(f"  [Detect] 未发现原生 404 页面，将使用注入样式")
+        
+        return result
+    
+    def detect_native_loading(self) -> Dict[str, Any]:
+        """检测页面是否有原生加载动画组件
+        
+        策略：
+        1. 检测页面中是否存在 loading/spinner 相关的 CSS 类或元素
+        2. 检测是否有隐藏的 loading overlay 可以被激活
+        """
+        result = {
+            'has_native_loading': False,
+            'loading_selectors': [],
+            'can_trigger_native': False,
+            'trigger_method': None,
+        }
+        
+        try:
+            # 方法1：检测现有的 loading 元素（可能是隐藏的）
+            for selector in self.LOADING_SELECTORS:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        result['has_native_loading'] = True
+                        result['loading_selectors'].append(selector)
+                except:
+                    continue
+            
+            # 方法2：检测是否有可以触发的 loading 机制
+            # 检查是否有 Angular/React/Vue 的 loading 服务
+            native_loading_check = self.driver.execute_script("""
+                // Angular Material
+                if (window.ng && document.querySelector('mat-progress-spinner, mat-progress-bar')) {
+                    return { framework: 'angular-material', available: true };
+                }
+                // ngx-spinner
+                if (window.NgxSpinnerService || document.querySelector('ngx-spinner')) {
+                    return { framework: 'ngx-spinner', available: true };
+                }
+                // Vue loading
+                if (window.Vue && document.querySelector('.v-progress-circular, .el-loading-mask')) {
+                    return { framework: 'vue', available: true };
+                }
+                // 通用：检测隐藏的 loading overlay
+                const hiddenLoaders = document.querySelectorAll(
+                    '[class*="loading"][style*="display: none"], ' +
+                    '[class*="spinner"][style*="display: none"], ' +
+                    '[class*="overlay"][style*="visibility: hidden"]'
+                );
+                if (hiddenLoaders.length > 0) {
+                    return { framework: 'hidden-overlay', available: true, selector: hiddenLoaders[0].className };
+                }
+                return { available: false };
+            """)
+            
+            if native_loading_check and native_loading_check.get('available'):
+                result['can_trigger_native'] = True
+                result['trigger_method'] = native_loading_check.get('framework')
+                print(f"  [Detect] 发现原生 Loading 机制: {native_loading_check.get('framework')}")
+                
+        except Exception as e:
+            print(f"  [Detect] Loading 检测失败: {e}")
+        
+        return result
+    
+    def detect_native_error_toast(self) -> Dict[str, Any]:
+        """检测页面是否有原生错误提示组件
+        
+        策略：
+        1. 检测是否有 toast/snackbar/notification 组件
+        2. 检测是否有可以触发的错误提示机制
+        """
+        result = {
+            'has_native_toast': False,
+            'toast_selectors': [],
+            'can_trigger_native': False,
+            'trigger_method': None,
+        }
+        
+        try:
+            # 方法1：检测现有的 toast 元素
+            for selector in self.ERROR_TOAST_SELECTORS:
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        result['has_native_toast'] = True
+                        result['toast_selectors'].append(selector)
+                except:
+                    continue
+            
+            # 方法2：检测是否有可以触发的 toast 服务
+            native_toast_check = self.driver.execute_script("""
+                // Angular Material Snackbar
+                if (window.ng) {
+                    const injector = window.ng.getInjector && window.ng.getInjector(document.body);
+                    if (injector) {
+                        try {
+                            // Angular 有 MatSnackBar 服务
+                            return { framework: 'angular-material', available: true };
+                        } catch(e) {}
+                    }
+                }
+                // 检测 Toastr
+                if (window.toastr) {
+                    return { framework: 'toastr', available: true };
+                }
+                // 检测 SweetAlert
+                if (window.Swal || window.swal) {
+                    return { framework: 'sweetalert', available: true };
+                }
+                // 检测 Vue 的 Element UI / Vuetify
+                if (window.Vue) {
+                    if (window.ELEMENT && window.ELEMENT.Message) {
+                        return { framework: 'element-ui', available: true };
+                    }
+                }
+                // 检测 React Toastify
+                if (window.ReactToastify) {
+                    return { framework: 'react-toastify', available: true };
+                }
+                return { available: false };
+            """)
+            
+            if native_toast_check and native_toast_check.get('available'):
+                result['can_trigger_native'] = True
+                result['trigger_method'] = native_toast_check.get('framework')
+                print(f"  [Detect] 发现原生 Toast 机制: {native_toast_check.get('framework')}")
+                
+        except Exception as e:
+            print(f"  [Detect] Toast 检测失败: {e}")
+        
+        return result
+    
+    def trigger_native_error_toast(self, error_message: str = "Server Error (500)") -> bool:
+        """尝试触发原生的错误提示
+        
+        Returns:
+            bool: 是否成功触发原生 toast
+        """
+        try:
+            result = self.driver.execute_script("""
+                const errorMsg = arguments[0];
+                
+                // 方法1: Angular Material Snackbar
+                if (window.ng) {
+                    try {
+                        const appRef = window.ng.getComponent(document.querySelector('[ng-version]'));
+                        if (appRef) {
+                            // 尝试注入错误
+                            const event = new CustomEvent('http-error', { detail: { status: 500, message: errorMsg } });
+                            document.dispatchEvent(event);
+                            return { triggered: true, method: 'angular-event' };
+                        }
+                    } catch(e) {}
+                }
+                
+                // 方法2: Toastr
+                if (window.toastr) {
+                    toastr.error(errorMsg, 'Error');
+                    return { triggered: true, method: 'toastr' };
+                }
+                
+                // 方法3: SweetAlert
+                if (window.Swal) {
+                    Swal.fire({ icon: 'error', title: 'Error', text: errorMsg });
+                    return { triggered: true, method: 'sweetalert' };
+                }
+                
+                // 方法4: Element UI
+                if (window.ELEMENT && window.ELEMENT.Message) {
+                    window.ELEMENT.Message.error(errorMsg);
+                    return { triggered: true, method: 'element-ui' };
+                }
+                
+                return { triggered: false };
+            """, error_message)
+            
+            if result and result.get('triggered'):
+                print(f"  [Trigger] 原生 Toast 触发成功: {result.get('method')}")
+                return True
+                
+        except Exception as e:
+            print(f"  [Trigger] 原生 Toast 触发失败: {e}")
+        
+        return False
+    
+    def trigger_native_loading(self) -> bool:
+        """尝试触发原生的 loading spinner
+        
+        Returns:
+            bool: 是否成功触发原生 loading
+        """
+        try:
+            result = self.driver.execute_script("""
+                // 方法1: 显示隐藏的 loading overlay
+                const hiddenLoaders = document.querySelectorAll(
+                    '[class*="loading"][style*="display: none"], ' +
+                    '[class*="spinner"][style*="display: none"], ' +
+                    '[class*="overlay"][style*="visibility: hidden"], ' +
+                    '.mat-progress-spinner, .mat-progress-bar, ' +
+                    '.ngx-spinner, .v-progress-circular'
+                );
+                
+                for (const loader of hiddenLoaders) {
+                    loader.style.display = 'flex';
+                    loader.style.visibility = 'visible';
+                    loader.style.opacity = '1';
+                    loader.style.position = 'fixed';
+                    loader.style.top = '0';
+                    loader.style.left = '0';
+                    loader.style.width = '100%';
+                    loader.style.height = '100%';
+                    loader.style.zIndex = '99999';
+                    loader.style.backgroundColor = 'rgba(0,0,0,0.5)';
+                    return { triggered: true, method: 'show-hidden', selector: loader.className };
+                }
+                
+                // 方法2: 触发 ngx-spinner
+                if (window.NgxSpinnerService) {
+                    // 无法直接访问服务，但可以触发事件
+                    document.dispatchEvent(new CustomEvent('spinner-show'));
+                    return { triggered: true, method: 'ngx-spinner-event' };
+                }
+                
+                return { triggered: false };
+            """)
+            
+            if result and result.get('triggered'):
+                print(f"  [Trigger] 原生 Loading 触发成功: {result.get('method')}")
+                return True
+                
+        except Exception as e:
+            print(f"  [Trigger] 原生 Loading 触发失败: {e}")
+        
+        return False
+    
 
 class JSNetworkInterceptor:
     def __init__(self, driver: webdriver.Chrome):
@@ -387,6 +835,8 @@ class InteractionInjector:
         ensure_dirs()
         self.feature_detector = PageFeatureDetector(self.driver)
         self.js_interceptor = JSNetworkInterceptor(self.driver)
+        self.native_detector = NativeErrorPageDetector(self.driver)  # 🆕 原生错误页面检测器
+        self._native_404_cache: Dict[str, str | None] = {}  # 缓存每个域名的原生 404 URL
 
     def _setup_driver(self):
         options = Options()
@@ -432,169 +882,58 @@ class InteractionInjector:
             pass
 
     def _prefill_form_fields(self) -> None:
-        """
-        智能填充表单字段，使 disabled 按钮变为可用状态。
-        支持多种输入类型和 Angular Material 组件。
-        """
+        """智能填充表单字段，使 disabled 按钮变为可用状态。"""
         filled_count = 0
-        # 基础样本数据
+        # 字段类型 → 默认值
         samples = {
-            "text": "testuser",
-            "email": "test@example.com", 
-            "password": "TestPass123!",
-            "search": "test query",
-            "tel": "1234567890",
-            "url": "https://example.com",
-            "number": "42",
-            "date": "2024-01-15",
-            "datetime-local": "2024-01-15T10:30",
+            "text": "testuser", "email": "test@example.com", "password": "TestPass123!",
+            "search": "test", "tel": "1234567890", "number": "42",
         }
-        
-        # 根据字段名/placeholder猜测合适的值
-        field_hints = {
-            "email": "test@example.com",
-            "mail": "test@example.com",
-            "user": "testuser123",
-            "name": "Test User",
-            "first": "John",
-            "last": "Doe",
-            "password": "TestPass123!",
-            "pass": "TestPass123!",
-            "confirm": "TestPass123!",
-            "repeat": "TestPass123!",
-            "phone": "1234567890",
-            "tel": "1234567890",
-            "mobile": "1234567890",
-            "address": "123 Test Street",
-            "city": "Test City",
-            "zip": "12345",
-            "postal": "12345",
-            "country": "United States",
-            "comment": "This is a test comment for form submission.",
-            "message": "Test message content.",
-            "subject": "Test Subject",
-            "question": "What is your favorite color?",
-            "answer": "Blue",
-            "quantity": "1",
-            "amount": "100",
+        # 字段名关键词 → 值
+        hints = {
+            "email": "test@example.com", "mail": "test@example.com",
+            "password": "TestPass123!", "pass": "TestPass123!", "confirm": "TestPass123!",
+            "name": "Test User", "phone": "1234567890", "comment": "Test comment.",
         }
         
         try:
-            # 1. 填充标准 input 和 textarea 字段
-            fields = self.driver.find_elements(By.CSS_SELECTOR,
-                "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='checkbox']):not([type='radio']):not([type='file']), textarea")
-            
-            for f in fields:
+            # 1. 填充 input/textarea
+            for f in self.driver.find_elements(By.CSS_SELECTOR,
+                "input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='checkbox']):not([type='radio']):not([type='file']), textarea"):
                 try:
-                    if not f.is_displayed():
+                    if not f.is_displayed() or (f.get_attribute("value") or "").strip():
                         continue
-                    # 跳过已有值的字段
-                    val = (f.get_attribute("value") or "").strip()
-                    if val:
-                        continue
-                    
-                    # 获取字段类型和标识
                     ftype = (f.get_attribute("type") or "text").lower()
-                    fname = (f.get_attribute("name") or "").lower()
-                    fid = (f.get_attribute("id") or "").lower()
-                    fplaceholder = (f.get_attribute("placeholder") or "").lower()
-                    flabel = (f.get_attribute("aria-label") or "").lower()
-                    
-                    # 综合判断字段用途
-                    field_context = f"{fname} {fid} {fplaceholder} {flabel}"
-                    
-                    # 优先根据上下文选择值
-                    sample = None
-                    for hint_key, hint_val in field_hints.items():
-                        if hint_key in field_context:
-                            sample = hint_val
-                            break
-                    
-                    # 否则根据类型选择默认值
-                    if not sample:
-                        sample = samples.get(ftype, "test input")
-                    
-                    # 清空并填充
+                    ctx = f"{f.get_attribute('name') or ''} {f.get_attribute('id') or ''} {f.get_attribute('placeholder') or ''}".lower()
+                    sample = next((v for k, v in hints.items() if k in ctx), samples.get(ftype, "test"))
                     f.clear()
                     f.send_keys(sample)
                     filled_count += 1
-                    
-                    # 触发 input/change 事件（Angular/React 需要）
-                    self.driver.execute_script("""
-                        const el = arguments[0];
-                        el.dispatchEvent(new Event('input', {bubbles: true}));
-                        el.dispatchEvent(new Event('change', {bubbles: true}));
-                        el.dispatchEvent(new Event('blur', {bubbles: true}));
-                    """, f)
-                    
-                except Exception:
-                    continue
+                    self.driver.execute_script("arguments[0].dispatchEvent(new Event('input',{bubbles:true}));arguments[0].dispatchEvent(new Event('change',{bubbles:true}));", f)
+                except: continue
             
-            # 2. 处理复选框（勾选必要的复选框，如"同意条款"）
-            checkboxes = self.driver.find_elements(By.CSS_SELECTOR, 
-                "input[type='checkbox'], mat-checkbox")
-            for cb in checkboxes:
+            # 2. 勾选复选框
+            for cb in self.driver.find_elements(By.CSS_SELECTOR, "input[type='checkbox'], mat-checkbox"):
                 try:
-                    if not cb.is_displayed():
-                        continue
-                    # 检查是否已勾选
-                    is_checked = cb.get_attribute("checked") or cb.get_attribute("aria-checked") == "true"
-                    if is_checked:
-                        continue
-                    # 勾选
-                    cb.click()
-                except Exception:
-                    continue
+                    if cb.is_displayed() and not (cb.get_attribute("checked") or cb.get_attribute("aria-checked") == "true"):
+                        cb.click()
+                except: continue
             
-            # 3. 处理 Angular Material 下拉框 (mat-select)
-            mat_selects = self.driver.find_elements(By.CSS_SELECTOR, "mat-select")
-            for ms in mat_selects:
+            # 3. 选择下拉框第一项
+            for ms in self.driver.find_elements(By.CSS_SELECTOR, "mat-select"):
                 try:
-                    if not ms.is_displayed():
-                        continue
-                    # 检查是否已选择
-                    selected = ms.get_attribute("aria-expanded")
-                    value_text = ms.text.strip()
-                    if value_text and value_text != "":
-                        continue  # 已有选择
-                    
-                    # 点击打开下拉框
-                    ms.click()
-                    time.sleep(0.3)
-                    
-                    # 选择第一个选项
-                    options = self.driver.find_elements(By.CSS_SELECTOR, "mat-option")
-                    if options:
-                        for opt in options:
-                            if opt.is_displayed():
-                                opt.click()
-                                break
-                    time.sleep(0.2)
-                except Exception:
-                    continue
-            
-            # 4. 处理单选按钮（选择第一个）
-            radio_groups = {}
-            radios = self.driver.find_elements(By.CSS_SELECTOR, "input[type='radio']")
-            for r in radios:
-                try:
-                    name = r.get_attribute("name")
-                    if name and name not in radio_groups:
-                        if r.is_displayed() and not r.is_selected():
-                            r.click()
-                            radio_groups[name] = True
-                except Exception:
-                    continue
-            
-            # 5. 短暂等待 Angular 响应
-            time.sleep(0.3)
+                    if ms.is_displayed() and not ms.text.strip():
+                        ms.click()
+                        time.sleep(0.2)
+                        opts = self.driver.find_elements(By.CSS_SELECTOR, "mat-option")
+                        if opts:
+                            for o in opts:
+                                if o.is_displayed(): o.click(); break
+                except: continue
             
             if filled_count > 0:
                 print(f"  [Prefill] Filled {filled_count} form field(s)")
-            
-        except Exception as e:
-            # 静默失败，不影响主流程
-            pass
+        except: pass
 
     def _get_element_info(self, element) -> Dict[str, Any]:
         info = {"tag": element.tag_name.lower(), "text": "", "id": "", "class": "", "aria_label": "", "bbox": element.rect}
@@ -631,108 +970,221 @@ class InteractionInjector:
 
     # --- injectors ---
     def inject_operation_no_response(self, element):
+        """注入 Operation_No_Response bug（包含两种子类型）
+        
+        Big Three Taxonomy - Type B:
+        - Sub-variant 1 (Dead Click): 阻止所有事件 + 网络拦截，点击无反应
+        - Sub-variant 2 (Timeout Hang): 显示 Loading Spinner 遮罩
+        
+        🆕 智能策略：
+        1. 优先尝试触发网站原生的 Loading Spinner
+        2. 如果没有原生 Loading → 使用注入样式 (5种随机选择)
+        """
         injection_success = False
+        used_native = False
+        loading_source = "injected"
+        
+        # 随机选择子类型：50% Dead Click, 50% Timeout Hang
+        sub_variant = random.choice(["dead_click", "timeout_hang"])
+        
+        # 🆕 关键修复：在点击前阻止元素的所有事件处理
+        try:
+            self.driver.execute_script("""
+                (function(el) {
+                    // 方法1：移除所有事件监听器（克隆替换）
+                    const clone = el.cloneNode(true);
+                    if (el.parentNode) {
+                        el.parentNode.replaceChild(clone, el);
+                    }
+                    
+                    // 方法2：阻止所有事件
+                    const blockEvents = ['click', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'submit'];
+                    blockEvents.forEach(evt => {
+                        clone.addEventListener(evt, function(e) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.stopImmediatePropagation();
+                            console.log('[ICE] Event blocked:', evt);
+                            return false;
+                        }, true);
+                    });
+                    
+                    // 视觉标记
+                    clone.style.outline = '3px solid #ff6b6b';
+                    clone.style.opacity = '0.6';
+                    clone.style.cursor = 'not-allowed';
+                    
+                    console.log('[ICE] Element events blocked for Operation_No_Response');
+                })(arguments[0]);
+            """, element)
+            injection_success = True
+        except Exception as e:
+            print(f"  [Inject] Operation_No_Response: ✗ Event blocking failed - {e}")
+        
+        # 网络拦截（作为额外保障）
         if self.use_js_interceptor:
             self.js_interceptor.inject_fetch_interceptor()
-            self.js_interceptor.reset_interceptor()  # 清除之前的配置
-            self.js_interceptor.clear_logs()  # 清除之前的日志
-            injection_success = self.js_interceptor.intercept_request_timeout(r'.*')
-            try:
-                self.driver.execute_script(
-                    "arguments[0].style.outline='3px solid #ff6b6b'; arguments[0].style.opacity='0.6';",
-                    element,
-                )
-            except Exception:
-                pass
+            self.js_interceptor.reset_interceptor()
+            self.js_interceptor.clear_logs()
+            self.js_interceptor.intercept_request_timeout(r'.*')
+        
+        # Sub-variant 2: Timeout Hang - 显示 Loading Spinner
+        if sub_variant == "timeout_hang":
+            # 🆕 优先尝试原生 Loading
+            native_loading = self.native_detector.detect_native_loading()
+            if native_loading.get('can_trigger_native'):
+                if self.native_detector.trigger_native_loading():
+                    used_native = True
+                    loading_source = f"native ({native_loading.get('trigger_method')})"
+                    print(f"  [Inject] Operation_No_Response: ✓ Using NATIVE Loading")
+                    injection_success = True
+            
+            # 没有原生或触发失败，使用注入样式
+            if not used_native:
+                loading_style = get_random_loading_style()
+                try:
+                    js_code = generate_loading_overlay_js(loading_style)
+                    self.driver.execute_script(js_code)
+                    loading_source = f"style: {loading_style['name']}"
+                    print(f"  [Inject] Operation_No_Response ({sub_variant}): ✓ Overlay injected ({loading_source})")
+                    injection_success = True
+                except Exception as e:
+                    print(f"  [Inject] Operation_No_Response ({sub_variant}): ✗ Overlay failed - {e}")
+        
         status = "✓ Injected" if injection_success else "✗ Failed"
-        print(f"  [Inject] Operation_No_Response: {status}")
-        return "Operation_No_Response", "Click initiated request but network was intercepted; no response received."
+        desc_suffix = f"(loading: {loading_source})" if sub_variant == "timeout_hang" else "(dead click)"
+        print(f"  [Inject] Operation_No_Response: {status} {desc_suffix}")
+        
+        return "Operation_No_Response", f"Click initiated request but network was intercepted; no response received {desc_suffix}."
 
     def inject_navigation_error(self, element):
+        """注入 Navigation_Error bug
+        
+        Big Three Taxonomy - Type A:
+        - 用户点击后被重定向到 404 页面/白屏/错误路由
+        
+        🆕 智能策略:
+        1. 首先检查缓存中是否有原生 404 页面信息
+        2. 如果有原生 404 → 直接导航到原生 404 (更真实、更多样)
+        3. 如果没有 → 使用注入样式 (随机选择5种样式之一)
+        
+        注意：为避免 stale element，我们先点击元素，再进行 404 检测/导航
+        """
         # 清除之前的拦截配置
         if self.use_js_interceptor:
             self.js_interceptor.reset_interceptor()
             self.js_interceptor.clear_logs()
+        
+        current_url = self.driver.current_url
+        base_url = '/'.join(current_url.split('/')[:3])
+        
         try:
+            # 劫持 pushState (SPA)
             self.driver.execute_script("""
                 const orig_pushState = window.history.pushState;
                 window.history.pushState = function(...args) {
-                    console.log('[ICE] Navigation hijacked to:', args[2]);
+                    console.log('[ICE] Navigation hijacked via pushState');
                     args[2] = '/nonexistent-page-' + Math.random().toString(36).substr(2, 9);
                     return orig_pushState.apply(this, args);
                 };
+                window.__ICE_NAV_ERROR__ = true;
             """)
             print("  [Inject] Navigation_Error: ✓ Injected")
         except Exception as e:
             print(f"  [Inject] Navigation_Error: ✗ Failed - {e}")
+        
+        # 🔥 先点击元素，再进行导航（避免 stale element）
         try:
             element.click()
         except Exception:
-            self.driver.execute_script("arguments[0].click();", element)
-        return "Navigation_Error", "Navigation hijacked; application loaded 404 or error page."
+            try:
+                self.driver.execute_script("arguments[0].click();", element)
+            except:
+                pass
+        
+        # 等待
+        time.sleep(0.3)
+        
+        # 🆕 检测原生 404 页面（点击后检测，元素已不重要）
+        native_404_result = self.native_detector.detect_native_404(base_url)
+        use_native = native_404_result['has_native_404']
+        native_404_url = native_404_result.get('native_404_url')
+        
+        if use_native and native_404_url:
+            # 🆕 使用网站原生 404 页面
+            try:
+                self.driver.get(native_404_url)
+                print(f"  [Inject] Navigation_Error: → Using NATIVE 404: {native_404_url}")
+                time.sleep(0.5)
+                return "Navigation_Error", f"Navigation hijacked; native 404 page displayed ({native_404_url})."
+            except Exception as e:
+                print(f"  [Inject] Navigation_Error: ✗ Native 404 failed - {e}, falling back to injected style")
+                use_native = False
+        
+        # 没有原生 404 或原生导航失败，使用注入样式
+        if not use_native:
+            style_404 = get_random_404_style()
+            try:
+                error_path = f"{base_url}/error-404-page-not-found-{random.randint(1000, 9999)}"
+                self.driver.get(error_path)
+                print(f"  [Inject] Navigation_Error: → Navigated to {error_path}")
+                
+                # 注入多样化 404 页面内容
+                time.sleep(0.5)
+                js_code = generate_404_page_js(style_404)
+                self.driver.execute_script(js_code)
+                print(f"  [Inject] Navigation_Error: ✓ 404 page injected (style: {style_404['name']})")
+                return "Navigation_Error", f"Navigation hijacked; 404 page displayed (style: {style_404['name']})."
+            except Exception as e:
+                print(f"  [Inject] Navigation_Error: ✗ Failed to navigate - {e}")
+        
+        return "Navigation_Error", "Navigation hijacked; error page displayed."
 
     def inject_unexpected_feedback(self, element):
+        """注入 Unexpected_Task_Result bug
+        
+        Big Three Taxonomy - Type C:
+        - 用户点击后系统返回可见错误 (500 Error Toast)
+        
+        🆕 智能策略：
+        1. 优先尝试触发网站原生的 Error Toast/Notification
+        2. 如果没有原生 → 使用注入样式 (5种随机选择)
+        """
         injection_success = False
+        used_native = False
+        toast_source = "injected"
+        
+        # 网络拦截返回 500
         if self.use_js_interceptor:
             self.js_interceptor.inject_fetch_interceptor()
-            self.js_interceptor.reset_interceptor()  # 清除之前的配置
-            self.js_interceptor.clear_logs()  # 清除之前的日志
+            self.js_interceptor.reset_interceptor()
+            self.js_interceptor.clear_logs()
             injection_success = self.js_interceptor.intercept_request_error(r'.*', error_code=500)
+        
+        # 🆕 优先尝试原生 Error Toast
+        native_toast = self.native_detector.detect_native_error_toast()
+        if native_toast.get('can_trigger_native'):
+            if self.native_detector.trigger_native_error_toast("Server Error: 500 Internal Server Error"):
+                used_native = True
+                toast_source = f"native ({native_toast.get('trigger_method')})"
+                print(f"  [Inject] Unexpected_Task_Result: ✓ Using NATIVE Toast")
+                injection_success = True
+        
+        # 没有原生或触发失败，使用注入样式
+        if not used_native:
+            error_style = get_random_error_toast_style()
+            try:
+                js_code = generate_error_toast_js(error_style)
+                self.driver.execute_script(js_code)
+                toast_source = f"style: {error_style['name']}"
+                print(f"  [Inject] Unexpected_Task_Result: ✓ Error Toast injected ({toast_source})")
+                injection_success = True
+            except Exception as e:
+                print(f"  [Inject] Unexpected_Task_Result: ✗ Toast injection failed - {e}")
+        
         status = "✓ Injected" if injection_success else "✗ Failed"
         print(f"  [Inject] Unexpected_Task_Result: {status}")
-        return "Unexpected_Task_Result", "API call returned 500 Internal Server Error; application error handler triggered."
-
-    def inject_timeout_hang(self, element):
-        injection_success = False
-        if self.use_js_interceptor:
-            self.js_interceptor.inject_fetch_interceptor()
-            self.js_interceptor.reset_interceptor()  # 清除之前的配置
-            self.js_interceptor.clear_logs()  # 清除之前的日志
-            injection_success = self.js_interceptor.set_global_delay(15000)
-        status = "✓ Injected" if injection_success else "✗ Failed"
-        print(f"  [Inject] Timeout_Hang: {status}")
-        return "Timeout_Hang", "Network latency simulated (15s); application shows loading spinner."
-
-    def inject_silent_failure(self, element):
-        injection_success = False
-        if self.use_js_interceptor:
-            self.js_interceptor.inject_fetch_interceptor()
-            self.js_interceptor.reset_interceptor()  # 清除之前的配置
-            self.js_interceptor.clear_logs()  # 清除之前的日志
-            try:
-                self.driver.execute_script("""
-                    if (window.__ICE_INTERCEPTOR__) {
-                        window.__ICE_INTERCEPTOR__.silent_mode = true;
-                    }
-                """)
-                injection_success = True
-            except Exception:
-                injection_success = False
-        status = "✓ Injected" if injection_success else "✗ Failed"
-        print(f"  [Inject] Silent_Failure: {status}")
-        return "Silent_Failure", "Request succeeded (200 OK) but response body was empty; operation silently failed."
-
-    def inject_validation_error(self, element):
-        inputs = self.driver.find_elements(By.CSS_SELECTOR, "input[type='text'], input[type='email'], input[type='number']")
-        if inputs:
-            target_input = random.choice(inputs)
-            dirty_data = "@@@###!!!"
-            try:
-                target_input.clear()
-                target_input.send_keys(dirty_data)
-                self.driver.execute_script(
-                    """
-                    arguments[0].dispatchEvent(new Event('input', { bubbles: true }));
-                    arguments[0].dispatchEvent(new Event('blur', { bubbles: true }));
-                    """,
-                    target_input,
-                )
-                print("  [Inject] Validation_Error: ✓ Injected (invalid data into input)")
-            except Exception as e:
-                print(f"  [Inject] Validation_Error: ✗ Failed - {e}")
-            return "Validation_Error", "Injected invalid data into input field; application validation triggered."
-        print("  [Inject] Validation_Error: ✗ No input fields found")
-        return "Validation_Error", "Validation error triggered but no input field found on page."
+        return "Unexpected_Task_Result", f"API returned 500 error; error toast displayed ({toast_source})."
 
     # --- visual evidence helpers ---
     def _dom_snapshot(self) -> Dict[str, Any]:
@@ -890,17 +1342,86 @@ class InteractionInjector:
         elif bug_type == "Silent_Failure":
             # 静默失败本身难以视觉验证，保持原有逻辑
             visual_ok = similarity > 0.985 and not signals["has_error_ele"] and not signals["has_spinner"]
-            
-        elif bug_type == "Validation_Error":
-            # 验证错误：显示验证元素或 invalid 输入
-            visual_ok = (
-                signals["has_validation_ele"] or 
-                signals["invalid_input_count"] > 0 or 
-                ("invalid" in text_after) or
-                ("required" in text_after and signals["has_error_ele"])
-            )
 
         return {"visual_verified": bool(visual_ok), "signals": signals}
+
+    def _calculate_visual_diff(self, img_path1: str, img_path2: str) -> Dict[str, Any]:
+        """
+        计算两张截图的视觉差异。
+        返回包含差异度量的字典。
+        """
+        result = {
+            "has_diff": False,
+            "diff_percentage": 0.0,
+            "diff_score": 0.0,
+            "method": "none",
+            "error": None
+        }
+        
+        if not os.path.exists(img_path1) or not os.path.exists(img_path2):
+            result["error"] = "Image files not found"
+            return result
+        
+        try:
+            # 优先使用 OpenCV（更精确）
+            if HAS_CV2:
+                img1 = cv2.imread(img_path1)
+                img2 = cv2.imread(img_path2)
+                
+                if img1 is None or img2 is None:
+                    result["error"] = "Failed to load images with cv2"
+                    return result
+                
+                # 确保尺寸一致
+                if img1.shape != img2.shape:
+                    img2 = cv2.resize(img2, (img1.shape[1], img1.shape[0]))
+                
+                # 计算结构相似度 (SSIM)
+                gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+                gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
+                ssim_score = ssim(gray1, gray2)
+                
+                # 计算像素差异百分比
+                diff = cv2.absdiff(img1, img2)
+                non_zero = np.count_nonzero(diff)
+                total_pixels = img1.shape[0] * img1.shape[1] * img1.shape[2]
+                diff_percentage = (non_zero / total_pixels) * 100
+                
+                result["method"] = "opencv_ssim"
+                result["diff_score"] = float(round(1.0 - ssim_score, 4))  # 转换为差异分数
+                result["diff_percentage"] = float(round(diff_percentage, 2))
+                # 如果 SSIM 差异 > 0.05 或像素差异 > 2%，认为有明显变化
+                result["has_diff"] = bool((1.0 - ssim_score) > 0.05 or diff_percentage > 2.0)
+                
+            # 回退到 PIL（更基础）
+            elif HAS_PIL:
+                img1 = Image.open(img_path1)
+                img2 = Image.open(img_path2)
+                
+                # 确保尺寸一致
+                if img1.size != img2.size:
+                    img2 = img2.resize(img1.size)
+                
+                # 计算像素差异
+                diff = ImageChops.difference(img1, img2)
+                diff_array = np.array(diff)
+                non_zero = np.count_nonzero(diff_array)
+                total_pixels = diff_array.size
+                diff_percentage = (non_zero / total_pixels) * 100
+                
+                result["method"] = "pil_pixel_diff"
+                result["diff_percentage"] = float(round(diff_percentage, 2))
+                # PIL 阈值：像素差异 > 5%
+                result["has_diff"] = bool(diff_percentage > 5.0)
+                
+            else:
+                result["error"] = "No image comparison library available (install opencv-python or pillow)"
+                
+        except Exception as e:
+            result["error"] = f"Diff calculation failed: {str(e)}"
+        
+        return result
+
     def execute_injection(self, element, bug_choice: str | None = None):
         uid = f"int_{uuid.uuid4().hex[:8]}"
         bug_type = "Unknown"
@@ -912,22 +1433,19 @@ class InteractionInjector:
         after_dom: Dict[str, Any] = {}
         elem_info = {"tag": "unknown", "text": "", "id": "", "class": "", "aria_label": "", "bbox": {}}
         center_x, center_y = 0, 0
+        normal_click_captured = False
+        reference_path = ""
 
+        # Big Three Bug Taxonomy mapping
         bug_name_mapping = {
             "Navigation_Error": "nav_error",
-            "Timeout_Hang": "timeout",
             "Operation_No_Response": "no_response",
-            "Validation_Error": "validation",
             "Unexpected_Task_Result": "fake_error",
-            "Silent_Failure": "silent",
         }
         display_name_from_key = {
             "nav_error": "Navigation_Error",
-            "timeout": "Timeout_Hang",
             "no_response": "Operation_No_Response",
-            "validation": "Validation_Error",
             "fake_error": "Unexpected_Task_Result",
-            "silent": "Silent_Failure",
         }
         if bug_choice and bug_choice in bug_name_mapping:
             bug_type_key = bug_name_mapping[bug_choice]
@@ -951,6 +1469,14 @@ class InteractionInjector:
                 pass
 
             elem_info = self._get_element_info(element)
+            
+            # 🆕 保存元素选择器，用于后续重新定位
+            element_selector = {
+                "id": elem_info.get("id", ""),
+                "text": elem_info.get("text", "")[:30] if elem_info.get("text") else "",
+                "css_selector": f"{elem_info.get('tag', 'button')}#{elem_info.get('id')}" if elem_info.get("id") else "",
+            }
+            
             rect = self.driver.execute_script(
                 """
                 const el = arguments[0];
@@ -968,6 +1494,21 @@ class InteractionInjector:
             }
             center_x = int(rect.get("x", 0) + rect.get("width", 0) / 2)
             center_y = int(rect.get("y", 0) + rect.get("height", 0) / 2)
+            
+            # 🆕 Visual Diff 策略：比较「点击前」vs「点击后」
+            # - Navigation_Error/Unexpected_Task_Result：期望有视觉变化
+            # - Operation_No_Response：期望没有视觉变化（页面冻结）或有 Loading Spinner
+            pre_click_screenshot_path = t1_path.replace("_end.png", "_pre_click.png")
+            pre_click_captured = False
+            
+            print(f"  [Visual Diff] Capturing pre-click state...")
+            try:
+                # 截取点击前的状态
+                self.driver.save_screenshot(pre_click_screenshot_path)
+                pre_click_captured = True
+                print(f"  [✓] Pre-click screenshot captured")
+            except Exception as e:
+                print(f"  [!] Failed to capture pre-click screenshot: {e}")
 
             # T0 action with pointer AND Label
             # Pass the intended bug type key as label (e.g. "Timeout_Hang" from key "timeout")
@@ -983,12 +1524,9 @@ class InteractionInjector:
                 bug_type, desc = self.inject_navigation_error(element)
             elif bug_type_key == "fake_error":
                 bug_type, desc = self.inject_unexpected_feedback(element)
-            elif bug_type_key == "timeout":
-                bug_type, desc = self.inject_timeout_hang(element)
-            elif bug_type_key == "silent":
-                bug_type, desc = self.inject_silent_failure(element)
             else:
-                bug_type, desc = self.inject_validation_error(element)
+                # Fallback to Navigation_Error if unknown key
+                bug_type, desc = self.inject_navigation_error(element)
             
             print(f"  [Injected] bug_type={bug_type}, desc={desc[:60]}...")
 
@@ -1056,6 +1594,55 @@ class InteractionInjector:
                 if self.use_js_interceptor:
                     interceptor_logs = self.js_interceptor.get_logs()
 
+                # 🆕 计算视觉 Diff（对比「点击前」vs「点击后」）
+                visual_diff_result = {}
+                visual_diff_verified = False
+                
+                if pre_click_captured and os.path.exists(pre_click_screenshot_path):
+                    print(f"  [Visual Diff] Comparing pre-click vs post-click state...")
+                    try:
+                        # 计算两张截图的差异（点击前 vs 点击后）
+                        # 对于 end screenshot，需要使用没有红标的版本
+                        t1_clean_path = t1_path.replace("_end.png", "_end_clean.png")
+                        self.driver.save_screenshot(t1_clean_path)
+                        
+                        visual_diff_result = self._calculate_visual_diff(pre_click_screenshot_path, t1_clean_path)
+                        has_visual_change = visual_diff_result.get("has_diff", False)
+                        diff_pct = visual_diff_result.get("diff_percentage", 0)
+                        
+                        # 🎯 根据 bug 类型决定验证逻辑
+                        if bug_type == "Operation_No_Response":
+                            # Operation_No_Response：期望页面冻结，即没有视觉变化
+                            # 如果像素差异 < 1%，则验证成功（页面确实冻结了）
+                            visual_diff_verified = bool(diff_pct < 1.0)
+                            if visual_diff_verified:
+                                print(f"  [✓ Visual Diff] Page frozen confirmed: only {diff_pct:.2f}% change (expected < 1%)")
+                            else:
+                                print(f"  [✗ Visual Diff] Page not frozen: {diff_pct:.2f}% change (expected < 1%)")
+                        else:
+                            # 其他 bug 类型：期望有明显视觉变化（错误页面、错误消息等）
+                            visual_diff_verified = bool(has_visual_change)
+                            if visual_diff_verified:
+                                print(f"  [✓ Visual Diff] Visual change detected: {diff_pct:.2f}% pixels changed")
+                            else:
+                                print(f"  [✗ Visual Diff] No significant visual change: {diff_pct:.2f}%")
+                        
+                        visual_diff_result["expected_behavior"] = "no_change" if bug_type == "Operation_No_Response" else "change"
+                        visual_diff_result["verified"] = bool(visual_diff_verified)
+                        
+                        # 清理临时截图
+                        try:
+                            os.remove(pre_click_screenshot_path)
+                            os.remove(t1_clean_path)
+                        except:
+                            pass
+                    except Exception as e:
+                        print(f"  [!] Visual diff calculation failed: {e}")
+                        visual_diff_result = {"error": str(e)}
+                else:
+                    visual_diff_result = {"error": "Pre-click screenshot not captured"}
+                    print(f"  [!] Skipping visual diff (no pre-click screenshot)")
+
                 # Visual + network + console evidence
                 visual_eval = {}
                 visual_verified = False
@@ -1080,12 +1667,21 @@ class InteractionInjector:
                 console_logs = console_logs_after
 
                 has_network_logs = len(interceptor_logs) > 0
+                
+                # 🆕 综合判定逻辑：加入视觉 diff 作为强证据
                 injection_verified = False
-                if bug_type in ["Navigation_Error", "Validation_Error"]:
+                if visual_diff_verified:
+                    # 视觉 diff 作为最强证据：如果检测到明显视觉变化，直接验证通过
+                    injection_verified = True
+                    print(f"  [✓ Verification] Verified by visual diff (strongest evidence)")
+                elif bug_type == "Navigation_Error":
+                    # Navigation_Error 依赖 DOM 变化（URL 跳转到 404）
                     injection_verified = visual_verified or has_network_logs
                 elif has_network_logs:
+                    # 有网络日志即验证通过
                     injection_verified = True
                 else:
+                    # 回退到视觉验证
                     injection_verified = visual_verified
 
                 meta = {
@@ -1112,6 +1708,8 @@ class InteractionInjector:
                     "timestamp": str(datetime.now()),
                     "injection_verified": injection_verified,
                     "visual_verified": visual_verified,
+                    "visual_diff": visual_diff_result,  # 🆕 新增视觉 diff 结果
+                    "visual_diff_verified": visual_diff_verified,  # 🆕 视觉 diff 是否验证通过
                     "visual_signals": visual_eval.get("signals", {}),
                     "has_network_logs": len(interceptor_logs) > 0,
                 }

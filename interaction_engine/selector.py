@@ -278,6 +278,19 @@ def _is_valid_candidate(driver, el, allow_disabled_submit=False) -> bool:
         # 获取元素属性
         elem_id = (el.get_attribute("id") or "").lower()
         
+        # 🆕 2.5 排除纯前端交互按钮（不触发网络请求）
+        # 这些按钮只是关闭弹窗、切换UI状态，不适合 Operation_No_Response
+        pure_ui_keywords = [
+            "dismiss", "close", "cancel", "back", "previous", "next",
+            "toggle", "show", "hide", "expand", "collapse",
+            "help", "getting started", "tutorial", "tour", "welcome",
+            "cookie", "accept", "decline", "agree", "privacy",
+            "notification", "alert", "modal", "dialog", "popup"
+        ]
+        combined = f"{elem_text} {aria_label} {elem_class} {elem_id}"
+        if any(kw in combined for kw in pure_ui_keywords):
+            return False
+        
         # 3. 排除导航logo/品牌链接
         if any(kw in elem_class for kw in ["logo", "brand", "navbar-brand"]):
             return False
@@ -333,7 +346,51 @@ def _is_valid_candidate(driver, el, allow_disabled_submit=False) -> bool:
             if any(kw in combined_text for kw in skip_toolbar_keywords):
                 return False
         
-        # 8. CSS可见性检查
+        # 8. 🆕 检测"空状态"按钮（如空购物车的 Checkout 按钮）
+        # 这些按钮虽然存在但实际上不会触发任何有意义的操作
+        is_empty_state_button = driver.execute_script("""
+            const el = arguments[0];
+            const text = (el.textContent || '').toLowerCase();
+            const ariaLabel = (el.getAttribute('aria-label') || '').toLowerCase();
+            
+            // 检查是否是购物车/结账相关按钮
+            const checkoutKeywords = ['checkout', 'check out', 'proceed', 'place order', 'buy now'];
+            const isCheckoutButton = checkoutKeywords.some(kw => text.includes(kw) || ariaLabel.includes(kw));
+            
+            if (isCheckoutButton) {
+                // 检查页面上是否有"空"状态指示
+                const pageText = document.body.innerText.toLowerCase();
+                const emptyIndicators = [
+                    'your basket is empty',
+                    'your cart is empty', 
+                    'no items in cart',
+                    'total price: 0',
+                    'total: $0',
+                    'total: 0',
+                    '0 items',
+                    'cart (0)',
+                    'basket (0)',
+                    'empty cart',
+                    'nothing in your cart'
+                ];
+                if (emptyIndicators.some(ind => pageText.includes(ind))) {
+                    return true;  // 是空状态按钮
+                }
+                
+                // 检查是否有 disabled 样式
+                const style = getComputedStyle(el);
+                if (style.opacity < 0.6 || style.cursor === 'not-allowed') {
+                    return true;
+                }
+            }
+            
+            return false;
+        """, el)
+        
+        if is_empty_state_button:
+            return False  # 排除空状态按钮
+        
+        # 9. CSS可见性检查
         style = driver.execute_script(
             """
             const el = arguments[0];
